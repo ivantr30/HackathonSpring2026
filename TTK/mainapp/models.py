@@ -16,8 +16,7 @@ def validate_audio_size(value):
     limit_mb = 50
     if value.size > limit_mb * 1024 * 1024:
         raise ValidationError(f'Файл слишком большой! Максимум {limit_mb} МБ.')
-    
-# ВАЛИДАЦИЯ ПАРОЛЯ В ФОРМАХ   
+     
 class User(AbstractUser):
     username = models.CharField(
         max_length=35, 
