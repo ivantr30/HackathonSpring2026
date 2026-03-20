@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="{% static '/css/Player.css' %}">
 </head>
 <body>
-    <h1>zov</h1>
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button type="submit">logout</button>

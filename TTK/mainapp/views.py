@@ -4,6 +4,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.contrib.auth.models import Group 
 
 # Create your views here.
 @login_required 
@@ -12,13 +13,15 @@ def player(request):
 def register(request):
 
     if request.user.is_authenticated:
-        return player(request)
+        return redirect('player')
     
     if request.method == "POST":
         form = RegistrationForm(request.POST)
 
         if form.is_valid():
             user = form.save()
+            listener = Group.objects.get_or_create(name="Слушатель")
+            user.groups.add(listener)
             return redirect_if_user_wasnt_auth(request, user)
     else:
         form = RegistrationForm()
@@ -56,4 +59,4 @@ def redirect_if_user_wasnt_auth(request, user):
     ):
         return redirect(next_url)
     else:
-        return player(request)
+        return redirect('player')
