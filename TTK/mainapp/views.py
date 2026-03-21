@@ -4,10 +4,16 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.models import Group 
-from .models import Audio, Video, MediatekElement, Playlist, Session
+from .models import Audio, Video, MediatekElement, Playlist, Session, VoiceMessage, TextMessage, Message
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.utils import timezone
+
 import random
 # Create your views here.
 
@@ -15,9 +21,6 @@ def user_is_host(request):
     return request.user.groups.filter(name="Ведущий").exists() or request.user.is_superuser
 def user_is_admin(request):
     return request.user.groups.filter(name="Админ").exists() or request.user.is_superuser
-
-from django.shortcuts import render, get_object_or_404
-
 @login_required
 def player_lobby(request):
     active_sessions = Session.objects.all().order_by('-id')
@@ -29,9 +32,11 @@ def player_room(request, session_id):
     return render(request, 'player.html', {'session': selected_session})
 @login_required
 def host(request):
+    # Проверка прав доступа
     if not user_is_host(request):
         return redirect('player_lobby')
     
+    # 1. СОЗДАНИЕ СЕССИИ (Если её еще нет)
     if not request.user.sessions.exists():
         if request.method == "POST":
             form = SessionForm(request.POST)
@@ -41,32 +46,54 @@ def host(request):
                 new_session.save()
             else:
                 return
-            return render(request, 'host.html', {"has_session" : True, "is_playing" : request.user.sessions.all()[0].is_playing})
+            return render(request, 'host.html', {
+                "has_session": True, 
+                "is_playing": request.user.sessions.all()[0].is_playing
+            })
         else:
             form = SessionForm()
-            return render(request, 'host.html', {'form' : form, "has_session" : False, "is_playing" : False})
+            return render(request, 'host.html', {
+                'form': form, 
+                "has_session": False, 
+                "is_playing": False
+            })
+
+    # ==============================================================
+    # 2. СБОР ДАННЫХ ДЛЯ ПАНЕЛИ (Медиатека, Плейлист, Сообщения)
+    # ==============================================================
+    
+    # Медиатека
     my_audio = Audio.objects.filter(owner=request.user).order_by('-id')
     my_video = Video.objects.filter(owner=request.user).order_by('-id')
-    playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
     
+    # Плейлист и Shuffle
+    playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
     playlist_elements = list(playlist.elements.all()) if playlist else []
-
     current_session = request.user.sessions.first()
 
     if current_session and current_session.is_shuffled:
         shuffled_ids = request.session.get('shuffled_ids', [])
         if shuffled_ids:
-            # Сортируем треки точно в том порядке, который запомнили при нажатии кнопки Shuffle
             playlist_elements.sort(key=lambda x: shuffled_ids.index(x.id) if x.id in shuffled_ids else 999)
 
+    # === НОВОЕ: ВЫГРУЖАЕМ СООБЩЕНИЯ ОТ СЛУШАТЕЛЕЙ ===
+    # Достаем сообщения, отправленные ИМЕННО ЭТОМУ ведущему (host=request.user)
+    active_msgs = Message.objects.filter(host=request.user, state__in=['new', 'in_progress']).order_by('-creation_time')
+    archived_msgs = Message.objects.filter(host=request.user, state='done').order_by('-creation_time')
+
+    # 3. РЕНДЕР СТРАНИЦЫ
     return render(request, 'host.html', {
-        "form" : None, 
-        "has_session" : True,
-        "is_playing" : current_session.is_playing if current_session else False, 
+        "form": None, 
+        "has_session": True,
+        "is_playing": current_session.is_playing if current_session else False, 
         "session": current_session,
-        "my_video" : my_video,
-        "my_audio" : my_audio,
-        "playlist_elements" : playlist_elements
+        "my_video": my_video,
+        "my_audio": my_audio,
+        "playlist_elements": playlist_elements,
+        
+        # === НОВОЕ: ПЕРЕДАЕМ СООБЩЕНИЯ В HTML ===
+        "active_msgs": active_msgs,
+        "archived_msgs": archived_msgs
     })
 
 @login_required
@@ -236,4 +263,128 @@ def delete_media(request, media_type, media_id):
         
         messages.success(request, f"Файл '{name}' успешно удален из медиатеки.")
         
+    return redirect('host')
+@csrf_exempt # Отключаем CSRF, так как шлем из JS (для хакатона это безопасно)
+@login_required
+def upload_voice_message(request):
+    if request.method == "POST":
+        voice_file = request.FILES.get('voice_blob')
+        action_type = request.POST.get('action_type') # Получаем команду: 'live' или 'playlist'
+
+        if voice_file:
+            # 1. Сохраняем голосовое как обычный аудиофайл в медиатеку
+            time_now = timezone.now().strftime('%H:%M:%S')
+            audio_obj = Audio.objects.create(
+                owner=request.user, 
+                name=f"🎙️ Голос ведущего ({time_now})", 
+                audio_file=voice_file
+            )
+
+            # 2. Обработка действий
+            if action_type == 'playlist':
+                # ПРОСТО В ПЛЕЙЛИСТ
+                playlist, _ = Playlist.objects.get_or_create(owner=request.user, title="Очередь эфира")
+                playlist.elements.add(audio_obj)
+                
+            elif action_type == 'live':
+                # СРАЗУ В ЭФИР (Микширование)
+                channel_layer = get_channel_layer()
+                # Берем первую сессию юзера, чтобы узнать в какую комнату слать
+                session = request.user.sessions.first()
+                if session:
+                    room_name = f"stream_{session.id}"
+                    async_to_sync(channel_layer.group_send)(
+                        room_name,
+                        {
+                            'type': 'broadcast', # Вызовет функцию broadcast в consumers.py
+                            'event': 'play_host_voice',
+                            'url': audio_obj.audio_file.url # Передаем URL файла
+                        }
+                    )
+            return JsonResponse({'status': 'ok'})
+    return JsonResponse({'error': 'bad request'}, status=400)
+@login_required
+def send_message(request):
+    if request.method == "POST":
+        session = Session.objects.filter(is_playing=True).first()
+        if not session:
+            session = Session.objects.first()
+            
+        if not session:
+            messages.error(request, "Нет активных ведущих.")
+            return redirect(request.META.get('HTTP_REFERER', 'player_lobby'))
+
+        host_user = session.owner
+        new_msg = None
+        text_content = request.POST.get('text', '') # Берем пустую строку, если нет текста
+        voice_file = request.FILES.get('voice_message')
+
+        # 1. СОХРАНЯЕМ В БД
+        if text_content:
+            new_msg = TextMessage.objects.create(
+                sender=request.user, host=host_user, text=text_content,
+                creation_time=timezone.now(), state='new'
+            )
+            messages.success(request, "Текст отправлен!")
+
+        elif voice_file:
+            new_msg = VoiceMessage.objects.create(
+                sender=request.user, host=host_user, voice_message=voice_file,
+                creation_time=timezone.now(), state='new'
+            )
+            messages.success(request, "Голос отправлен!")
+
+        # ========================================================
+        # 2. ИСПРАВЛЕННЫЙ WEBSOCKET (МАКСИМАЛЬНО БЕЗОПАСНЫЙ СЛОВАРЬ)
+        # ========================================================
+        if new_msg:
+            # Если это текст, берем текст, если голос - берем пустую строку
+            safe_text = str(text_content) if text_content else ""
+            
+            # Если это голос, берем его URL, если текст - пустую строку
+            safe_voice_url = new_msg.voice_message.url if voice_file else ""
+
+            channel_layer = get_channel_layer()
+            room_name = f"stream_{session.id}"
+            
+            # Передаем ТОЛЬКО примитивные типы (int, str)
+            async_to_sync(channel_layer.group_send)(
+                room_name,
+                {
+                    'type': 'broadcast', # Вызовет broadcast в consumers.py
+                    'event': 'new_message', 
+                    'msg_id': int(new_msg.id),
+                    'sender': str(request.user.username),
+                    'text': safe_text,
+                    'voice_url': safe_voice_url,
+                }
+            )
+
+    return redirect(request.META.get('HTTP_REFERER', 'player_lobby'))
+
+# 2. ВЕДУЩИЙ МЕНЯЕТ СТАТУС
+@login_required
+def change_msg_status(request, msg_id):
+    if request.method == "POST":
+        msg = get_object_or_404(Message, id=msg_id, host=request.user)
+        new_status = request.POST.get('status')
+        
+        # Если статус правильный - меняем
+        if new_status in dict(Message.STATUS_CHOICES).keys():
+            msg.state = new_status
+            msg.save()
+            
+    return redirect('host')
+@login_required
+def delete_session(request):
+    if request.method == "POST":
+        # Находим первую сессию текущего пользователя (или можно использовать ID, если сессий несколько)
+        session = Session.objects.filter(owner=request.user).first()
+        if session:
+            # Опционально: можно перед удалением разослать слушателям по WebSocket сигнал "Эфир завершен"
+            # Но для простоты сейчас просто удаляем сессию из БД
+            session.delete()
+            messages.success(request, "Эфир успешно завершен и удален.")
+            
+    # Возвращаем ведущего обратно в его панель (там появится форма создания нового эфира)
     return redirect('host')

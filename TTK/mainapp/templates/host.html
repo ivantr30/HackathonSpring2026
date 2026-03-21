@@ -24,10 +24,23 @@
             </form>
         {% endif %}
         
-        <!-- Главный переключатель из ТЗ -->
-        <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}" style="font-size: 16px; padding: 12px 20px;">
-            {% if not is_playing %}▶ Начать эфир{% else %}⏸ Приостановить эфир{% endif %}
-        </button>
+        <!-- Кнопки появятся ТОЛЬКО если есть сессия -->
+        {% if has_session %}
+            
+            <!-- Кнопка старта/паузы -->
+            <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}" style="font-size: 16px; padding: 12px 20px;">
+                {% if not is_playing %}▶ Начать эфир{% else %}⏸ Приостановить эфир{% endif %}
+            </button>
+
+            <!-- НОВАЯ КНОПКА: ЗАВЕРШИТЬ (УДАЛИТЬ) ЭФИР -->
+            <form action="{% url 'delete_session' %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите навсегда завершить и удалить этот эфир?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary" style="font-size: 14px; padding: 12px 15px; background: #e74c3c; color: white;" title="Удалить текущую сессию">
+                    ⏹ Завершить эфир
+                </button>
+            </form>
+            
+        {% endif %}
     </div>
 </div>
 
@@ -154,15 +167,17 @@
         <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
 
         <!-- Работа с микрофоном -->
-        <h3>🎙️ Микрофон (Аудиосообщение)</h3>
+         <h3>🎙️ Микрофон (Аудиосообщение)</h3>
         <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Запишите голос, чтобы добавить его в плейлист или сразу запустить слушателям.</p>
         <div style="display: flex; flex-direction: column; gap: 10px;">
-            <button class="btn btn-danger">⏺ Записать аудио</button>
-            <button class="btn btn-primary">Отправить в плейлист</button>
-            <button class="btn btn-success">▶ В эфир (Микширование)</button>
+            <button id="btn-rec-start" class="btn btn-danger">⏺ Начать запись</button>
+            
+            <!-- Этот блок покажем только после окончания записи -->
+            <div id="mic-actions" style="display: none; gap: 10px;">
+                <button id="btn-send-playlist" class="btn btn-primary" style="flex:1;">В плейлист</button>
+                <button id="btn-send-live" class="btn btn-success" style="flex:1;">▶ Сразу в эфир</button>
+            </div>
         </div>
-
-        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
     </div>
 
     <!-- КОЛОНКА 3: УПРАВЛЕНИЕ СООБЩЕНИЯМИ (По ТЗ) -->
@@ -171,33 +186,45 @@
 
         <!-- Активные (Новый, В работе) -->
         <h3>Новые и в работе:</h3>
-        <div class="media-list" style="max-height: 350px; background: white; border: none; padding: 0;">
+        <div id="active-messages-list" class="media-list" style="max-height: 350px; background: white; border: none; padding: 0;">
             
-            <!-- Пример сообщения "Новый" -->
-            <div class="msg-card">
+            {% for msg in active_msgs %}
+            <div class="msg-card {% if msg.state == 'in_progress' %}in-progress{% endif %}">
                 <div class="msg-header">
-                    <strong>Слушатель_1</strong>
-                    <span style="color: #ff0000; font-weight: bold;">Новый</span>
+                    <strong>{{ msg.sender.username }}</strong>
+                    <span style="color: {% if msg.state == 'new' %}#ff0000{% else %}#f1c40f{% endif %}; font-weight: bold;">
+                        {{ msg.get_state_display }}
+                    </span>
                 </div>
-                <p style="font-size: 14px; margin-bottom: 5px;">Поставьте мой любимый трек!</p>
-                <div class="msg-actions">
-                    <button class="btn btn-secondary btn-small">В работу</button>
-                    <button class="btn btn-success btn-small">Завершить</button>
-                </div>
-            </div>
+                
+                <!-- Проверяем, текст это или голосовое (мы писали это ранее в моделях) -->
+                {% if msg.textmessage.id %}
+                    <p style="font-size: 14px; margin-bottom: 5px;">{{ msg.textmessage.text }}</p>
+                {% elif msg.voicemessage.id %}
+                    <audio controls src="{{ msg.voicemessage.voice_message.url }}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>
+                {% endif %}
 
-            <!-- Пример сообщения "В работе" (Голосовое) -->
-            <div class="msg-card in-progress">
-                <div class="msg-header">
-                    <strong>Аня</strong>
-                    <span style="color: #d35400; font-weight: bold;">В работе (В эфире)</span>
-                </div>
-                <!-- Плеер для прослушивания голосового от юзера -->
-                <audio controls style="width: 100%; height: 30px; margin-top: 5px;"></audio>
+                <!-- КНОПКИ СМЕНЫ СТАТУСА -->
                 <div class="msg-actions">
-                    <button class="btn btn-success btn-small">Завершить</button>
+                    <!-- Кнопка "В работу" показывается только для Новых -->
+                    {% if msg.state == 'new' %}
+                    <form action="{% url 'change_msg_status' msg.id %}" method="POST" style="margin:0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="in_progress">
+                        <button type="submit" class="btn btn-secondary btn-small">В работу</button>
+                    </form>
+                    {% endif %}
+                    
+                    <form action="{% url 'change_msg_status' msg.id %}" method="POST" style="margin:0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="done">
+                        <button type="submit" class="btn btn-success btn-small">Завершить</button>
+                    </form>
                 </div>
             </div>
+            {% empty %}
+                <p style="color: gray; font-size: 13px;">Новых сообщений нет.</p>
+            {% endfor %}
         </div>
 
         <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
@@ -205,93 +232,95 @@
         <!-- Архив (Завершено) -->
         <h3>🗄️ Архив (Завершенные):</h3>
         <div class="media-list" style="max-height: 200px; background: white; border: none; padding: 0;">
+            {% for msg in archived_msgs %}
             <div class="msg-card done">
                 <div class="msg-header">
-                    <strong>Иван Иванов</strong>
+                    <strong>{{ msg.sender.username }}</strong>
                     <span>Завершено</span>
                 </div>
-                <p style="font-size: 14px; margin: 0;">Привет радио!</p>
+                <p style="font-size: 14px; margin: 0;">
+                    {% if msg.textmessage.id %} {{ msg.textmessage.text|truncatechars:30 }} 
+                    {% else %} 🎙️ Голосовое сообщение {% endif %}
+                </p>
             </div>
+            {% empty %}
+                <p style="color: gray; font-size: 13px;">Архив пуст.</p>
+            {% endfor %}
         </div>
     </div>
 
 </div>
 
 <!-- ФЛАГ СОСТОЯНИЯ ЭФИРА ИЗ DJANGO -->
+<!-- =================================================== -->
+<!-- СКРИПТЫ, КОТОРЫЕ ЗАВИСЯТ ОТ СОЗДАННОЙ СЕССИИ        -->
+<!-- =================================================== -->
+{% if has_session %}
+<!-- Передаем флаг состояния из Django в JS -->
 {{ is_playing|json_script:"is_playing-flag" }}
 
-<!-- ТВОЙ СОХРАНЕННЫЙ СКРИПТ (Без изменений логики) -->
-<script>    // Берем ID сессии прямо из шаблона Django
-    const sessionId = {{ session.id }};
+<script>
+    // 1. ПОДКЛЮЧЕНИЕ К WEBSOCKET
+    const sessionId = "{{ session.id }}";
+    const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const socket = new WebSocket(wsProtocol + window.location.host + "/ws/stream/" + sessionId + "/");
     
-    // Подставляем его в URL WebSocket!
-    const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream/" + sessionId + "/");
     let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
+
+    // 2. ЛОГИКА ПЛЕЙЛИСТА И МЕТРОНОМА
+    const isLooping = {{ session.is_looping|yesno:"true,false" }};
+    let currentTrackUrl = "";
+    const hostGhostPlayer = new Audio();
+    hostGhostPlayer.muted = true; // Ведущий не слышит звук
+
+    hostGhostPlayer.onended = function() {
+        playNextTrack();
+    };
+
     function getPlaylistUrls() {
         const buttons = document.querySelectorAll('.media-list .btn-success.btn-small');
         let urls = [];
         buttons.forEach(btn => {
-            // Вытаскиваем URL из атрибута onclick (например: playTrack('/media/song.mp3'))
             const match = btn.getAttribute('onclick').match(/'([^']+)'/);
             if (match) urls.push(match[1]);
         });
         return urls;
     }
 
-    const isLooping = {{ session.is_looping|yesno:"true,false" }};
-    let currentTrackUrl = "";
-
-    // 2. Создаем "невидимый плеер-метроном" для ведущего
-    const hostGhostPlayer = new Audio();
-    hostGhostPlayer.muted = true; // Ведущий не слышит звук, чтобы не было эха
-
-    // Когда трек заканчивается - автоматически включаем следующий
-    hostGhostPlayer.onended = function() {
-        playNextTrack();
-    };
-
-    // 3. Функция запуска трека (ЕЁ ВЫЗЫВАЕТ КНОПКА В HTML)
-    // В HTML кнопка должна быть такой: onclick="playTrack('{{ item.url }}')"
     function playTrack(fileUrl) {
         currentTrackUrl = fileUrl;
         
-        // Отправляем команду слушателям через WebSocket
         socket.send(JSON.stringify({ 
             'action': 'change_track',
             'url': fileUrl
         }));
 
-        // Запускаем невидимый отсчет времени у ведущего
         hostGhostPlayer.src = fileUrl;
         hostGhostPlayer.play();
 
-        // Снимаем эфир с паузы, если он был остановлен
         if (!isPlaying) {
             toggleStream();
         }
     }
 
-    // 4. Логика поиска следующего трека
     function playNextTrack() {
         const urls = getPlaylistUrls();
-        if (urls.length === 0) return; // Очередь пуста
+        if (urls.length === 0) return;
 
-        // Находим, какой трек играл только что
         let currentIndex = urls.indexOf(currentTrackUrl);
         let nextIndex = currentIndex + 1;
 
-        // Если это был последний трек
         if (nextIndex >= urls.length) {
             if (isLooping) {
-                nextIndex = 0; // Начинаем сначала
+                nextIndex = 0;
             } else {
-                return; // Конец эфира
+                return;
             }
         }
-
-        // Запускаем следующий
         playTrack(urls[nextIndex]);
     }
+
+    // 3. УПРАВЛЕНИЕ ЭФИРОМ (Пауза/Плей)
     function toggleStream() {
         const streamtoggler = document.getElementById("streamToggler");
         isPlaying = !isPlaying;
@@ -301,37 +330,152 @@
             streamtoggler.innerText = "⏸ Приостановить эфир";
             streamtoggler.classList.replace('btn-success', 'btn-danger'); 
             action = "play";
-            
-            // Снимаем метроном с паузы
             if (hostGhostPlayer.src) hostGhostPlayer.play(); 
-            
         } else {
             streamtoggler.innerText = "▶ Начать эфир";
             streamtoggler.classList.replace('btn-danger', 'btn-success'); 
             action = "pause";
-            
-            // Ставим метроном на паузу
             hostGhostPlayer.pause(); 
         }
         
-        socket.send(JSON.stringify({
-            'action': action,
-        }));
+        socket.send(JSON.stringify({'action': action}));
+    }
+
+    // 4. ЗАПИСЬ ГОЛОСА И ОТПРАВКА
+    let mediaRecorder;
+    let audioChunks = [];
+    let voiceBlob = null;
+    const btnRecStart = document.getElementById('btn-rec-start');
+    const micActions = document.getElementById('mic-actions');
+
+    if (btnRecStart) {
+        btnRecStart.onclick = async () => {
+            if (btnRecStart.innerText.includes("Начать")) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    
+                    mediaRecorder.onstop = () => {
+                        voiceBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        stream.getTracks().forEach(t => t.stop());
+                        btnRecStart.style.display = 'none';
+                        micActions.style.display = 'flex';
+                    };
+
+                    mediaRecorder.start();
+                    btnRecStart.innerText = "⏹ Остановить запись";
+                    btnRecStart.classList.replace('btn-danger', 'btn-secondary');
+                } catch (err) {
+                    alert("Нет доступа к микрофону!");
+                }
+            } else {
+                mediaRecorder.stop();
+            }
+        };
+    }
+
+    function sendHostVoice(actionType) {
+        if (!voiceBlob) return;
+        
+        if (actionType === 'live' && !isPlaying) {
+            alert('❌ Ошибка: Вы не можете сказать в эфир, пока он находится на паузе! Сначала снимите эфир с паузы.');
+            return; 
+        }
+
+        const fd = new FormData();
+        fd.append('voice_blob', voiceBlob, 'host_voice.mp3');
+        fd.append('action_type', actionType);
+
+        fetch('/host/upload-voice/', { method: 'POST', body: fd })
+        .then(() => {
+            micActions.style.display = 'none';
+            btnRecStart.style.display = 'block';
+            btnRecStart.innerText = "⏺ Начать запись";
+            btnRecStart.classList.replace('btn-secondary', 'btn-danger');
+            voiceBlob = null;
+            
+            if (actionType === 'playlist') {
+                location.reload(); 
+            } else {
+                alert('Голос отправлен в прямой эфир!');
+                location.reload(); 
+            }
+        });
+    }
+
+    if (document.getElementById('btn-send-playlist')) {
+        document.getElementById('btn-send-playlist').onclick = () => sendHostVoice('playlist');
+    }
+    if (document.getElementById('btn-send-live')) {
+        document.getElementById('btn-send-live').onclick = () => sendHostVoice('live');
+    }
+
+    // 5. ПРИЕМ СООБЩЕНИЙ ОТ СЛУШАТЕЛЕЙ
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        
+        if (data.event_type === 'new_message') {
+            const msgList = document.getElementById('active-messages-list');
+            const noMsgText = document.getElementById('no-msg-text');
+            if (noMsgText) noMsgText.style.display = 'none'; 
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // ИСПРАВЛЕНО: Проверяем не на null, а на наличие символов в строке!
+            let contentHtml = "";
+            if (data.text && data.text.length > 0) {
+                contentHtml = `<p style="font-size: 14px; margin-bottom: 5px;">${data.text}</p>`;
+            } else if (data.voice_url && data.voice_url.length > 0) {
+                contentHtml = `<audio controls src="${data.voice_url}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>`;
+            }
+
+            const newHtml = `
+                <div class="msg-card" style="border-left-color: #1db954;">
+                    <div class="msg-header">
+                        <strong>${data.sender}</strong>
+                        <span style="color: #1db954; font-weight: bold;">Только что!</span>
+                    </div>
+                    ${contentHtml}
+                    <div class="msg-actions">
+                        <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
+                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                            <input type="hidden" name="status" value="in_progress">
+                            <button type="submit" class="btn btn-secondary btn-small">В работу</button>
+                        </form>
+                        <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
+                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                            <input type="hidden" name="status" value="done">
+                            <button type="submit" class="btn btn-success btn-small">Завершить</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            if (msgList) {
+                msgList.insertAdjacentHTML('afterbegin', newHtml);
+            }
+        }
     };
+</script>
+{% endif %}
+
+<!-- =================================================== -->
+<!-- ГЛОБАЛЬНЫЕ СКРИПТЫ (Работают всегда, даже без сессии) -->
+<!-- =================================================== -->
+<script>
     document.addEventListener("DOMContentLoaded", function() {
         const alerts = document.querySelectorAll('.alert');
-        
         alerts.forEach(function(alert) {
             setTimeout(function() {
                 alert.classList.add('fade-out');
-                
                 setTimeout(function() {
                     alert.remove();
                 }, 500); 
-                
             }, 3000);
         });
     });
-    </script>
 </script>
 {% endblock %}

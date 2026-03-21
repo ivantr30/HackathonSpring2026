@@ -220,9 +220,9 @@
         <h2>✉️ Написать в студию</h2>
 
         <!-- ТЗ: Отправка сообщения ведущему (Текст) -->
-        <form method="POST" action="#" class="form-group">
+        <form method="POST" action="{% url 'send_message' %}" class="form-group">
             {% csrf_token %}
-            <textarea name="text" class="form-control" placeholder="Ваше сообщение ведущему..."></textarea>
+            <textarea name="text" class="form-control" placeholder="Ваше сообщение ведущему..." required></textarea>
             <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Отправить текст</button>
         </form>
 
@@ -254,7 +254,78 @@
     const audioVisualizer = document.getElementById('audio-visualizer');
 
     let isVideoMode = false; // Флаг: играет видео или аудио
+ socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        console.log("Получена команда от ведущего:", data.event_type);
+        
+        // --- КОМАНДА: ПАУЗА ---
+        if (data.event_type === 'pause') {
+            if (isVideoMode) {
+                videoPlayer.pause();
+            } else {
+                audioPlayer.pause();
+            }
+            // Меняем кнопки у слушателя (чтобы он видел, что стоит пауза)
+            btnPlay.style.display = 'flex';
+            btnPause.style.display = 'none';
+        } 
+        
+        // --- КОМАНДА: ПЛЕЙ (СНЯТЬ С ПАУЗЫ) ---
+        else if (data.event_type === 'play') {
+            if (isVideoMode) {
+                videoPlayer.play();
+            } else {
+                audioPlayer.play();
+            }
+            btnPlay.style.display = 'none';
+            btnPause.style.display = 'flex';
+        }
 
+        // --- КОМАНДА: ВКЛЮЧИТЬ НОВЫЙ ТРЕК/ВИДЕО ---
+        else if (data.event_type === 'change_track') {
+            const url = data.url.toLowerCase();
+            
+            // Если ведущий включил видео (mp4 или webm)
+            if (url.endsWith('.mp4') || url.endsWith('.webm')) {
+                switchToVideo(data.url); // Эта функция уже написана выше в твоем коде
+            } else {
+                // Если аудио
+                switchToAudio(data.url); // И эта тоже есть!
+            }
+        }
+
+        // --- КОМАНДА: ВЕДУЩИЙ ГОВОРИТ (МИКШИРОВАНИЕ) ---
+        else if (data.event_type === 'play_host_voice') {
+            // Приглушаем фоновую музыку до 10%
+            let wasPlaying = !audioPlayer.paused;
+            let currentVolume = document.getElementById('volume-slider').value; // Запоминаем текущую громкость
+            
+            if (wasPlaying) {
+                audioPlayer.volume = currentVolume * 0.1; 
+            }
+            
+            // Запускаем голос ведущего
+            const hostVoicePlayer = new Audio(data.url);
+            hostVoicePlayer.volume = currentVolume; // Голос играет на нормальной громкости
+            
+            hostVoicePlayer.play().catch(e => {
+                console.log("Браузер заблокировал автоплей голоса", e);
+            });
+            
+            // Когда ведущий договорил - возвращаем музыку на прежнюю громкость
+            hostVoicePlayer.onended = () => {
+                if (wasPlaying) {
+                    audioPlayer.volume = currentVolume;
+                }
+            };
+        }
+    };
+
+    // 4. Если сокет порвался (например, слушатель свернул браузер на мобилке)
+    socket.onclose = function(e) {
+        console.error("Потеряна связь с эфиром. Обновите страницу.");
+        // Можно показать красивую плашку ошибки
+    };
     // ТЗ: Включение воспроизведения
     function playMedia() {
         if (isVideoMode) {
@@ -356,20 +427,35 @@
         
         voiceStatus.innerText = "⏳ Отправка...";
         
-        // Здесь ты добавишь логику fetch/WebSocket для отправки voiceBlob на сервер
-        /* 
+        // Формируем файл
         const formData = new FormData();
         formData.append('voice_message', voiceBlob, 'message.mp3');
-        fetch('/api/send_voice/', { method: 'POST', body: formData })
-        */
         
-        setTimeout(() => {
-            voiceStatus.innerText = "✅ Успешно отправлено!";
-            voiceStatus.style.color = "#2ecc71";
-            btnRecSend.style.display = 'none';
-            btnRecStart.style.display = 'block';
-            voiceBlob = null;
-        }, 1000);
+        // Чтобы Django принял POST через JS, нам нужен CSRF-токен
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Отправляем
+        fetch('{% url "send_message" %}', { 
+            method: 'POST', 
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                voiceStatus.innerText = "✅ Успешно отправлено!";
+                voiceStatus.style.color = "#2ecc71";
+                btnRecSend.style.display = 'none';
+                btnRecStart.style.display = 'block';
+                voiceBlob = null;
+                
+                // Перезагрузим страницу, чтобы вылез зеленый Alert Django "Сообщение отправлено"
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                alert("Ошибка отправки.");
+            }
+        });
     }
 </script>
 {% endblock %}

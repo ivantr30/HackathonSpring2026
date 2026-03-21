@@ -18,6 +18,10 @@ urlpatterns = [
     path('host/toggle-shuffle/', views.toggle_shuffle, name='toggle_shuffle'),
     path('host/toggle-loop/', views.toggle_loop, name='toggle_loop'),
     path('host/delete-media/<str:media_type>/<int:media_id>/', views.delete_media, name='delete_media'),
+    path('host/upload-voice/', views.upload_voice_message, name='upload_voice_message'),
+    path('player/send-message/', views.send_message, name='send_message'),
+    path('host/change-msg-status/<int:msg_id>/', views.change_msg_status, name='change_msg_status'),
+    path('host/delete-session/', views.delete_session, name='delete_session'),
 ]
 
 if settings.DEBUG:
