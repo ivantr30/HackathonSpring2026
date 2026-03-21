@@ -4,14 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTKstream - {% block title %}{% endblock %}</title>
+    <title>ПОТОК - {% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static '/css/base.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
+    {% if user.is_authenticated %}
     <header>
         <nav>
+            <div class="logo"><a href="{% url 'player' %}">ПОТОК</a></div>
+            <ul>
+                <li><a href="{% url 'player' %}">Главная</a></li>
+                <li>
+                    <form method="post" action="{% url 'logout' %}" class="logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-logout">Выход</button>
+                    </form>
+                </li>
+            </ul>           
         </nav>
     </header>
+    {% endif %}
 
     <main>
         {% if messages %}
@@ -26,7 +39,7 @@
     </main>
 
     <footer>
-        <p>&copy; 2026 TTKstream. Все права защищены.</p>
+        <p>&copy; 2026 Поток. Все права защищены.</p>
     </footer>
 </body>
 </html>
