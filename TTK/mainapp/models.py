@@ -27,25 +27,43 @@ class User(AbstractUser):
             )
         ]
     )
-    fullName = models.CharField(max_length=100, verbose_name="ФИО", validators=[RegexValidator(regex=r'^[[А-Яа-яЁё\s-]+$',)])
+    fullName = models.CharField(max_length=100, verbose_name="ФИО", validators=[RegexValidator(regex=r'^[А-Яа-яЁё\s-]+$',)])
     def __str__(self):
         return self.username[:20]
-    
+
+
 class Message(models.Model):
+    
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='messages')
     host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='receivedmessages')
-    text = models.TextField()
+    STATUS_CHOICES = [
+        ('new', 'Новое'),
+        ('in_progress', 'В работе'),
+        ('done', 'Завершено'),
+    ]
+    state = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
     def __str__(self):
-        return self.text
-class VoiceMessage(models.Model):
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='voices')
-    host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='receivedvoices')
+        return self.sender.__str__()
+    
+class Session(models.Model):
+    title = models.CharField(max_length=50)
+    elements = models.ManyToManyField(Message, related_name='sessions', blank=True)
+    def __str__(self):
+        return self.title[:20]
+
+class VoiceMessage(Message):
     voice_message = models.FileField(
         upload_to='voice/', 
         validators=[FileExtensionValidator(allowed_extensions=['mp3', 'wav', 'ogg'])],
     )
     def __str__(self):
-        return self.sender.__str__()
+        return super().__str__()
+    
+class TextMessage(Message):
+    text = models.TextField()
+    def __str__(self):
+        return super().__str__()
+    
 class MediatekElement(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mediatekelements')
     name = models.CharField(max_length=100)
