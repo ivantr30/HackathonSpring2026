@@ -53,8 +53,15 @@
         <!-- Плейлист (Очередь воспроизведения) -->
         <h3>📻 Текущий плейлист (Очередь)</h3>
         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔀 Перемещать</button>
-            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔁 Зациклить</button>
+            <form action="{% url 'toggle_shuffle' %}" method="POST" style="flex: 1; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn {% if session.is_shuffled %}btn-primary{% else %}btn-secondary{% endif %}" style="width: 100%; font-size: 12px;">🔀 Перемешать</button>
+            </form>
+
+            <form action="{% url 'toggle_loop' %}" method="POST" style="flex: 1; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn {% if session.is_looping %}btn-primary{% else %}btn-secondary{% endif %}" style="width: 100%; font-size: 12px;">🔁 Зациклить</button>
+            </form>
         </div>
         
         <div class="media-list" style="background: #f0fff4;">
@@ -64,7 +71,7 @@
                 <span>{{ forloop.counter }}. {{ item.name }}</span>
                 <div style="display: flex; gap: 5px;">
                     
-                    <button class="btn btn-success btn-small" onclick="playTrack('{{ item.url }}')">▶ Играть</button>
+                    <button class="btn btn-success btn-small" onclick="playTrack('{{ item.url }}', {{ forloop.counter0 }})">▶ Играть</button>
                     
                     <form action="{% url 'remove_from_playlist' item.id %}" method="POST" style="margin: 0;">
                         {% csrf_token %}
@@ -210,7 +217,71 @@
 <script>
     const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream");
     let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
+    function getPlaylistUrls() {
+        const buttons = document.querySelectorAll('.media-list .btn-success.btn-small');
+        let urls = [];
+        buttons.forEach(btn => {
+            // Вытаскиваем URL из атрибута onclick (например: playTrack('/media/song.mp3'))
+            const match = btn.getAttribute('onclick').match(/'([^']+)'/);
+            if (match) urls.push(match[1]);
+        });
+        return urls;
+    }
 
+    const isLooping = {{ session.is_looping|yesno:"true,false" }};
+    let currentTrackUrl = "";
+
+    // 2. Создаем "невидимый плеер-метроном" для ведущего
+    const hostGhostPlayer = new Audio();
+    hostGhostPlayer.muted = true; // Ведущий не слышит звук, чтобы не было эха
+
+    // Когда трек заканчивается - автоматически включаем следующий
+    hostGhostPlayer.onended = function() {
+        playNextTrack();
+    };
+
+    // 3. Функция запуска трека (ЕЁ ВЫЗЫВАЕТ КНОПКА В HTML)
+    // В HTML кнопка должна быть такой: onclick="playTrack('{{ item.url }}')"
+    function playTrack(fileUrl) {
+        currentTrackUrl = fileUrl;
+        
+        // Отправляем команду слушателям через WebSocket
+        socket.send(JSON.stringify({ 
+            'action': 'change_track',
+            'url': fileUrl
+        }));
+
+        // Запускаем невидимый отсчет времени у ведущего
+        hostGhostPlayer.src = fileUrl;
+        hostGhostPlayer.play();
+
+        // Снимаем эфир с паузы, если он был остановлен
+        if (!isPlaying) {
+            toggleStream();
+        }
+    }
+
+    // 4. Логика поиска следующего трека
+    function playNextTrack() {
+        const urls = getPlaylistUrls();
+        if (urls.length === 0) return; // Очередь пуста
+
+        // Находим, какой трек играл только что
+        let currentIndex = urls.indexOf(currentTrackUrl);
+        let nextIndex = currentIndex + 1;
+
+        // Если это был последний трек
+        if (nextIndex >= urls.length) {
+            if (isLooping) {
+                nextIndex = 0; // Начинаем сначала
+            } else {
+                return; // Конец эфира
+            }
+        }
+
+        // Запускаем следующий
+        playTrack(urls[nextIndex]);
+    }
     function toggleStream() {
         const streamtoggler = document.getElementById("streamToggler");
         isPlaying = !isPlaying;
@@ -220,10 +291,17 @@
             streamtoggler.innerText = "⏸ Приостановить эфир";
             streamtoggler.classList.replace('btn-success', 'btn-danger'); 
             action = "play";
+            
+            // Снимаем метроном с паузы
+            if (hostGhostPlayer.src) hostGhostPlayer.play(); 
+            
         } else {
             streamtoggler.innerText = "▶ Начать эфир";
             streamtoggler.classList.replace('btn-danger', 'btn-success'); 
             action = "pause";
+            
+            // Ставим метроном на паузу
+            hostGhostPlayer.pause(); 
         }
         
         socket.send(JSON.stringify({

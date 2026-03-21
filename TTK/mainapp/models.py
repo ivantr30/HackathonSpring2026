@@ -79,6 +79,8 @@ class Session(models.Model):
     current_track_paused_time = models.FloatField(default=0.0, null=True, blank=True)
     current_track = models.ForeignKey(MediatekElement, on_delete=models.SET_NULL, null=True, blank=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sessions')
+    is_looping = models.BooleanField(default=False)
+    is_shuffled = models.BooleanField(default=False)
 
     def get_state(self):
         if not self.current_track:

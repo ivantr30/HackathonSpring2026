@@ -8,6 +8,7 @@ from .models import Audio, Video, MediatekElement, Playlist
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+import random
 # Create your views here.
 
 def user_is_host(request):
@@ -39,14 +40,26 @@ def host(request):
     my_audio = Audio.objects.filter(owner=request.user).order_by('-id')
     my_video = Video.objects.filter(owner=request.user).order_by('-id')
     playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
-    playlist_elements = playlist.elements.all() if playlist else []
+    
+    playlist_elements = list(playlist.elements.all()) if playlist else []
 
-    return render(request, 'host.html', {"form" : None, 
-                                         "has_session" : True,
-                                         "is_playing" : request.user.sessions.all()[0].is_playing, 
-                                         "my_video" : my_video,
-                                         "my_audio" : my_audio,
-                                         "playlist_elements" : playlist_elements})
+    current_session = request.user.sessions.first()
+
+    if current_session and current_session.is_shuffled:
+        shuffled_ids = request.session.get('shuffled_ids', [])
+        if shuffled_ids:
+            # Сортируем треки точно в том порядке, который запомнили при нажатии кнопки Shuffle
+            playlist_elements.sort(key=lambda x: shuffled_ids.index(x.id) if x.id in shuffled_ids else 999)
+
+    return render(request, 'host.html', {
+        "form" : None, 
+        "has_session" : True,
+        "is_playing" : current_session.is_playing if current_session else False, 
+        "session": current_session,
+        "my_video" : my_video,
+        "my_audio" : my_audio,
+        "playlist_elements" : playlist_elements
+    })
 
 @login_required
 def upload_media(request):
@@ -155,4 +168,37 @@ def remove_from_playlist(request, item_id):
         if playlist:
             playlist.elements.remove(item)
             
+    return redirect('host')
+@login_required
+def toggle_shuffle(request):
+    if request.method == "POST":
+        session = request.user.sessions.first()
+        if session:
+            # Переключаем кнопку
+            session.is_shuffled = not session.is_shuffled
+            session.save()
+            
+            if session.is_shuffled:
+                # Включили Shuffle: берем треки, перемешиваем их ID и запоминаем!
+                playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
+                if playlist:
+                    # Достаем список ID (например: [1, 2, 3])
+                    ids = list(playlist.elements.values_list('id', flat=True))
+                    random.shuffle(ids) # Перемешиваем: [3, 1, 2]
+                    
+                    # Сохраняем в память (куки сервера)
+                    request.session['shuffled_ids'] = ids
+            else:
+                # Выключили Shuffle: удаляем память
+                if 'shuffled_ids' in request.session:
+                    del request.session['shuffled_ids']
+
+    return redirect('host')
+@login_required
+def toggle_loop(request):
+    if request.method == "POST":
+        session = request.user.sessions.first()
+        if session:
+            session.is_looping = not session.is_looping
+            session.save()
     return redirect('host')

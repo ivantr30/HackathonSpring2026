@@ -14,6 +14,8 @@ urlpatterns = [
     path("logout", views.logout_view, name="logout"),
     path('host/playlist/add/<int:item_id>/', views.add_to_playlist, name='add_to_playlist'),
     path('host/playlist/remove/<int:item_id>/', views.remove_from_playlist, name='remove_from_playlist'),
+    path('host/toggle-shuffle/', views.toggle_shuffle, name='toggle_shuffle'),
+    path('host/toggle-loop/', views.toggle_loop, name='toggle_loop'),
 ]
 
 if settings.DEBUG:
