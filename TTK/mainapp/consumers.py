@@ -15,20 +15,20 @@ class StreamListener(AsyncWebsocketConsumer):
     
     async def receive(self, text_data):
         data = json.loads(text_data)
-        is_playing = data['is_playing']
+        action = data['action']
 
-        if is_playing == False:
+        if action == "pause":
             await self.set_session_paused()
             
             await self.channel_layer.group_send(
-                self.room_group_name, {'type': 'broadcast', 'event': 'pause'}
+                self.room_name, {'type': 'broadcast', 'event': 'pause'}
             )
 
-        elif is_playing == True:
+        elif action == "play":
         
             await self.set_session_playing()
             await self.channel_layer.group_send(
-                self.room_group_name, {'type': 'broadcast', 'event': 'play'}
+                self.room_name, {'type': 'broadcast', 'event': 'play'}
             )
 
     async def broadcast(self, event):

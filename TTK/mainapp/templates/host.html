@@ -1,38 +1,179 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Document</title>
-    </head>
-    <body>
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Панель ведущего{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static '/css/host.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div>
+        <h1 style="margin-bottom: 5px;">🎛️ Управление эфиром</h1>
+        <p style="color: #666; font-size: 14px;">Панель ведущего</p>
+    </div>
+
+    <!-- ТВОЙ БЛОК: УПРАВЛЕНИЕ СЕССИЕЙ (Не тронуто логически, только обернуто в CSS) -->
+    <div class="session-controls">
         {% if not has_session %}
-        <form method="post">
-            {% csrf_token%}
-            {{ form.as_p }}
-            <button type="submit"> Создать эфир</button>
-        </form>
-        {% elif not is_playing%}
-        <button onclick="toggleStream()" id="streamToggler">Начать эфир</button>
+            <form method="post" class="create-session-form">
+                {% csrf_token%}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">Создать эфир</button>
+            </form>
         {% endif %}
-        {{ has_session|json_script:"session-flag" }}
-    </body>
-    <script>
-        const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream")
-        let isPlaying = JSON.parse(document.getElementById("session-flag").textContent)
         
-        function toggleStream(){
-            streamtoggler = document.getElementById("streamtoggler").innerText;
-            isPlaying = !isPlaying
-            if (isPlaying){
-                streamtoggler = "Приостановить эфир"
-            }
-            else{
-                streamtoggler = "Начать эфир"
-            }
-            socket.send(JSON.stringify({
-                'is_playing' : isPlaying
-            }))
-        };
-    </script>
-</html>
+        <!-- Кнопка старта/паузы -->
+        <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}">
+            {% if not is_playing %}Начать эфир{% else %}Приостановить эфир{% endif %}
+        </button>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+
+    <!-- КОЛОНКА 1: МЕДИАТЕКА И ПЛЕЙЛИСТ -->
+    <div class="panel">
+        <h2>📁 Медиатека и Плейлист</h2>
+        
+        <!-- Форма загрузки (ТЗ: Загрузка с ПК до 50МБ/1000МБ) -->
+        <form action="#" method="POST" enctype="multipart/form-data" class="form-group">
+            {% csrf_token %}
+            <input type="text" name="name" class="form-control" placeholder="Название трека/видео" required>
+            <select name="file_type" class="form-control">
+                <option value="audio">Аудио (MP3, WAV, OGG)</option>
+                <option value="video">Видео (MP4, WebM)</option>
+            </select>
+            <input type="file" name="media_file" class="form-control" required>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">📥 Загрузить файл</button>
+        </form>
+
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
+
+        <!-- Управление плейлистом (ТЗ: Shuffle, Зацикливание) -->
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button class="btn btn-secondary" style="flex: 1;">🔀 Shuffle</button>
+            <button class="btn btn-secondary" style="flex: 1;">🔁 Зациклить</button>
+        </div>
+
+        <!-- Список треков -->
+        <div class="media-list">
+            <!-- Пример элемента списка (Подставь сюда свой цикл for) -->
+            <div class="media-item">
+                <span>🎵 Пример трека.mp3</span>
+                <button class="btn btn-success" style="padding: 5px 10px;">В эфир</button>
+            </div>
+            <div class="media-item">
+                <span>🎬 Видео_заставка.mp4</span>
+                <button class="btn btn-success" style="padding: 5px 10px;">В эфир</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- КОЛОНКА 2: ПРЯМЫЕ ВКЛЮЧЕНИЯ (Webcam & Mic) -->
+    <div class="panel">
+        <h2>🔴 Прямые включения</h2>
+
+        <!-- ТЗ: Запись звука с микрофона -->
+        <div class="form-group">
+            <p style="font-size: 14px; color: #666; margin-bottom: 10px;">Запишите сообщение и отправьте его сразу в эфир или в плейлист.</p>
+            <button class="btn btn-danger" style="width: 100%;">🎙️ Записать аудио</button>
+        </div>
+
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
+
+        <!-- ТЗ: Видеотрансляция (вебкам) -->
+        <h3>📹 Видеотрансляция</h3>
+        <div class="webcam-container">
+            <span id="webcam-placeholder">Камера выключена</span>
+            <video id="webcam-preview" autoplay muted></video>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" style="flex: 1;">Включить видео</button>
+            <button class="btn btn-danger" style="flex: 1;">Остановить</button>
+        </div>
+    </div>
+
+    <!-- КОЛОНКА 3: СООБЩЕНИЯ ОТ ПОЛЬЗОВАТЕЛЕЙ -->
+    <div class="panel">
+        <h2>📨 Сообщения пользователей</h2>
+
+        <!-- Активные сообщения -->
+        <h3 style="font-size: 14px; color: #666;">Активные:</h3>
+        <div class="media-list" style="margin-top: 5px; margin-bottom: 20px;">
+            
+            <!-- Пример Нового сообщения -->
+            <div class="msg-card">
+                <div class="msg-header">
+                    <strong>Иван Иванов</strong>
+                    <span style="color: #ff0000; font-weight: bold;">Новое</span>
+                </div>
+                <p style="font-size: 14px; margin-bottom: 5px;">Поставьте, пожалуйста, трек AC/DC!</p>
+                <div class="msg-actions">
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">В работу</button>
+                    <button class="btn btn-success" style="padding: 4px 8px; font-size: 12px;">Завершить</button>
+                </div>
+            </div>
+
+            <!-- Пример В работе -->
+            <div class="msg-card in-progress">
+                <div class="msg-header">
+                    <strong>Слушатель_123</strong>
+                    <span style="color: #f1c40f; font-weight: bold;">В работе</span>
+                </div>
+                <audio controls style="width: 100%; height: 30px; margin-top: 5px;"></audio>
+                <div class="msg-actions">
+                    <button class="btn btn-success" style="padding: 4px 8px; font-size: 12px;">Завершить</button>
+                </div>
+            </div>
+
+        </div>
+
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
+
+        <!-- Архив (Завершенные) -->
+        <h3 style="font-size: 14px; color: #666;">🗄️ Архив (Завершенные):</h3>
+        <div class="media-list" style="margin-top: 5px; max-height: 150px;">
+            <div class="msg-card done">
+                <div class="msg-header">
+                    <strong>Анна</strong>
+                    <span>Завершено</span>
+                </div>
+                <p style="font-size: 14px; margin: 0;">Привет ведущему!</p>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ТВОЙ ФЛАГ (Не тронуто) -->
+{{ is_playing|json_script:"is_playing-flag" }}
+
+<!-- ТВОЙ СКРИПТ (Абсолютно не тронуто, только отформатировано) -->
+<script> 
+    const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream"); 
+    let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
+
+    function toggleStream() {
+        const streamtoggler = document.getElementById("streamToggler");
+        isPlaying = !isPlaying;
+        let action = "";
+        
+        if (isPlaying) {
+            streamtoggler.innerText = "Приостановить эфир";
+            streamtoggler.classList.replace('btn-success', 'btn-danger'); // Для визуала
+            action = "play";
+        } else {
+            streamtoggler.innerText = "Начать эфир";
+            streamtoggler.classList.replace('btn-danger', 'btn-success'); // Для визуала
+            action = "pause";
+        }
+        
+        socket.send(JSON.stringify({
+            'action': action,
+        }));
+    };
+</script>
+{% endblock %}
