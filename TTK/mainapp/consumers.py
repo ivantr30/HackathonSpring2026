@@ -1,61 +1,110 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Session
+from .models import Session, MediatekElement
 from django.utils import timezone
+
 
 class StreamListener(AsyncWebsocketConsumer):
     async def connect(self):
-        # Достаем ID сессии из URL (ws://127.0.0.1:8000/ws/stream/1/)
         self.session_id = self.scope['url_route']['kwargs']['session_id']
         self.room_group_name = f"stream_{self.session_id}"
-        
+
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-    
+
+        state = await self.get_session_state()
+        if state:
+            await self.send(text_data=json.dumps({
+                'event_type': 'sync',
+                'state': state
+            }))
+
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-    
+
     async def receive(self, text_data):
         data = json.loads(text_data)
         action = data.get('action')
 
-        # Обработка паузы
         if action == "pause":
             await self.set_session_paused()
+            state = await self.get_session_state()
             await self.channel_layer.group_send(
-                self.room_group_name, {'type': 'broadcast', 'event': 'pause'}
+                self.room_group_name,
+                {
+                    'type': 'broadcast_state',
+                    'event_type': 'sync',
+                    'state': state
+                }
             )
-        # Обработка старта
+
         elif action == "play":
             await self.set_session_playing()
+            state = await self.get_session_state()
             await self.channel_layer.group_send(
-                self.room_group_name, {'type': 'broadcast', 'event': 'play'}
-            )
-        # Обработка смены трека ведущим
-        elif action == "change_track":
-            await self.channel_layer.group_send(
-                self.room_group_name, {'type': 'broadcast', 'event': 'change_track', 'url': data.get('url')}
+                self.room_group_name,
+                {
+                    'type': 'broadcast_state',
+                    'event_type': 'sync',
+                    'state': state
+                }
             )
 
-    # =========================================================
-    # ВОТ ОНА - ТА САМАЯ ФУНКЦИЯ (ИЗ-ЗА КОТОРОЙ БЫЛА ОШИБКА)
-    # =========================================================
+        elif action == "change_track":
+            track_id = data.get('track_id')
+            await self.change_track_in_db(track_id)
+
+            state = await self.get_session_state()
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'broadcast_state',
+                    'event_type': 'sync',
+                    'state': state
+                }
+            )
+
     async def broadcast(self, event):
         payload = event.copy()
-        
-        # Переименовываем 'event' в 'event_type' для нашего JS в плеере
         if 'event' in payload:
             payload['event_type'] = payload.pop('event')
-            
-        # Удаляем служебный ключ 'type', он нужен был только для самого Django
         if 'type' in payload:
             del payload['type']
-            
-        # Отправляем JSON всем слушателям
         await self.send(text_data=json.dumps(payload))
 
-    # --- Синхронные функции работы с БД ---
+    async def broadcast_state(self, event):
+        await self.send(text_data=json.dumps({
+            'event_type': event['event_type'],
+            'state': event['state']
+        }))
+
+    @database_sync_to_async
+    def get_session_state(self):
+        session = Session.objects.filter(id=self.session_id).first()
+        if not session:
+            return None
+
+        state = session.get_state()
+        current_track = state['current_track']
+
+        return {
+            'track_url': current_track.url() if current_track else "",
+            'position': state['position'],
+            'is_playing': state['is_playing']
+        }
+
+    @database_sync_to_async
+    def change_track_in_db(self, track_id):
+        session = Session.objects.filter(id=self.session_id).first()
+        track = MediatekElement.objects.filter(id=track_id).first()
+        if session and track:
+            session.current_track = track
+            session.current_track_paused_time = 0.0
+            session.current_track_start_time = timezone.now()
+            session.is_playing = True
+            session.save()
+
     @database_sync_to_async
     def set_session_paused(self):
         user = self.scope['user']
@@ -66,7 +115,7 @@ class StreamListener(AsyncWebsocketConsumer):
                 if session.current_track_start_time:
                     elapsed = (timezone.now() - session.current_track_start_time).total_seconds()
                     session.current_track_paused_time += elapsed
-                session.save() 
+                session.save()
 
     @database_sync_to_async
     def set_session_playing(self):

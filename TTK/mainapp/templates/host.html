@@ -83,8 +83,14 @@
             <div class="media-item playlist-item">
                 <span>{{ forloop.counter }}. {{ item.name }}</span>
                 <div style="display: flex; gap: 5px;">
-                    
-                    <button class="btn btn-success btn-small" onclick="playTrack('{{ item.url }}', {{ forloop.counter0 }})">▶ Играть</button>
+
+                    <button
+                        class="btn btn-success btn-small play-track-btn"
+                        data-track-id="{{ item.id }}"
+                        data-track-url="{{ item.url }}"
+                        onclick="playTrack({{ item.id }}, '{{ item.url }}')">
+                        ▶ Играть
+                    </button>
                     
                     <form action="{% url 'remove_from_playlist' item.id %}" method="POST" style="margin: 0;">
                         {% csrf_token %}
@@ -160,7 +166,7 @@
         <h3>🔊 Общая громкость эфира (Master)</h3>
         <div class="volume-control">
             <span>🔈</span>
-            <input type="range" min="0" max="100" value="100">
+            <input type="range" id="master-volume-slider" min="0" max="100" value="100">
             <span>🔊</span>
         </div>
 
@@ -259,223 +265,254 @@
 <!-- Передаем флаг состояния из Django в JS -->
 {{ is_playing|json_script:"is_playing-flag" }}
 
-<script>
-    // 1. ПОДКЛЮЧЕНИЕ К WEBSOCKET
-    const sessionId = "{{ session.id }}";
-    const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-    const socket = new WebSocket(wsProtocol + window.location.host + "/ws/stream/" + sessionId + "/");
-    
-    let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
-
-    // 2. ЛОГИКА ПЛЕЙЛИСТА И МЕТРОНОМА
-    const isLooping = {{ session.is_looping|yesno:"true,false" }};
-    let currentTrackUrl = "";
-    const hostGhostPlayer = new Audio();
-    hostGhostPlayer.muted = true; // Ведущий не слышит звук
-
-    hostGhostPlayer.onended = function() {
-        playNextTrack();
-    };
-
-    function getPlaylistUrls() {
-        const buttons = document.querySelectorAll('.media-list .btn-success.btn-small');
-        let urls = [];
-        buttons.forEach(btn => {
-            const match = btn.getAttribute('onclick').match(/'([^']+)'/);
-            if (match) urls.push(match[1]);
-        });
-        return urls;
-    }
-
-    function playTrack(fileUrl) {
-        currentTrackUrl = fileUrl;
-        
-        socket.send(JSON.stringify({ 
-            'action': 'change_track',
-            'url': fileUrl
-        }));
-
-        hostGhostPlayer.src = fileUrl;
-        hostGhostPlayer.play();
-
-        if (!isPlaying) {
-            toggleStream();
-        }
-    }
-
-    function playNextTrack() {
-        const urls = getPlaylistUrls();
-        if (urls.length === 0) return;
-
-        let currentIndex = urls.indexOf(currentTrackUrl);
-        let nextIndex = currentIndex + 1;
-
-        if (nextIndex >= urls.length) {
-            if (isLooping) {
-                nextIndex = 0;
-            } else {
-                return;
-            }
-        }
-        playTrack(urls[nextIndex]);
-    }
-
-    // 3. УПРАВЛЕНИЕ ЭФИРОМ (Пауза/Плей)
-    function toggleStream() {
-        const streamtoggler = document.getElementById("streamToggler");
-        isPlaying = !isPlaying;
-        let action = "";
-        
-        if (isPlaying) {
-            streamtoggler.innerText = "⏸ Приостановить эфир";
-            streamtoggler.classList.replace('btn-success', 'btn-danger'); 
-            action = "play";
-            if (hostGhostPlayer.src) hostGhostPlayer.play(); 
-        } else {
-            streamtoggler.innerText = "▶ Начать эфир";
-            streamtoggler.classList.replace('btn-danger', 'btn-success'); 
-            action = "pause";
-            hostGhostPlayer.pause(); 
-        }
-        
-        socket.send(JSON.stringify({'action': action}));
-    }
-
-    // 4. ЗАПИСЬ ГОЛОСА И ОТПРАВКА
-    let mediaRecorder;
-    let audioChunks = [];
-    let voiceBlob = null;
-    const btnRecStart = document.getElementById('btn-rec-start');
-    const micActions = document.getElementById('mic-actions');
-
-    if (btnRecStart) {
-        btnRecStart.onclick = async () => {
-            if (btnRecStart.innerText.includes("Начать")) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-
-                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                    
-                    mediaRecorder.onstop = () => {
-                        voiceBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-                        stream.getTracks().forEach(t => t.stop());
-                        btnRecStart.style.display = 'none';
-                        micActions.style.display = 'flex';
-                    };
-
-                    mediaRecorder.start();
-                    btnRecStart.innerText = "⏹ Остановить запись";
-                    btnRecStart.classList.replace('btn-danger', 'btn-secondary');
-                } catch (err) {
-                    alert("Нет доступа к микрофону!");
-                }
-            } else {
-                mediaRecorder.stop();
-            }
-        };
-    }
-
-    function sendHostVoice(actionType) {
-        if (!voiceBlob) return;
-        
-        if (actionType === 'live' && !isPlaying) {
-            alert('❌ Ошибка: Вы не можете сказать в эфир, пока он находится на паузе! Сначала снимите эфир с паузы.');
-            return; 
-        }
-
-        const fd = new FormData();
-        fd.append('voice_blob', voiceBlob, 'host_voice.mp3');
-        fd.append('action_type', actionType);
-
-        fetch('/host/upload-voice/', { method: 'POST', body: fd })
-        .then(() => {
-            micActions.style.display = 'none';
-            btnRecStart.style.display = 'block';
-            btnRecStart.innerText = "⏺ Начать запись";
-            btnRecStart.classList.replace('btn-secondary', 'btn-danger');
-            voiceBlob = null;
-            
-            if (actionType === 'playlist') {
-                location.reload(); 
-            } else {
-                alert('Голос отправлен в прямой эфир!');
-                location.reload(); 
-            }
-        });
-    }
-
-    if (document.getElementById('btn-send-playlist')) {
-        document.getElementById('btn-send-playlist').onclick = () => sendHostVoice('playlist');
-    }
-    if (document.getElementById('btn-send-live')) {
-        document.getElementById('btn-send-live').onclick = () => sendHostVoice('live');
-    }
-
-    // 5. ПРИЕМ СООБЩЕНИЙ ОТ СЛУШАТЕЛЕЙ
-    socket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        
-        if (data.event_type === 'new_message') {
-            const msgList = document.getElementById('active-messages-list');
-            const noMsgText = document.getElementById('no-msg-text');
-            if (noMsgText) noMsgText.style.display = 'none'; 
-            
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            
-            // ИСПРАВЛЕНО: Проверяем не на null, а на наличие символов в строке!
-            let contentHtml = "";
-            if (data.text && data.text.length > 0) {
-                contentHtml = `<p style="font-size: 14px; margin-bottom: 5px;">${data.text}</p>`;
-            } else if (data.voice_url && data.voice_url.length > 0) {
-                contentHtml = `<audio controls src="${data.voice_url}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>`;
-            }
-
-            const newHtml = `
-                <div class="msg-card" style="border-left-color: #1db954;">
-                    <div class="msg-header">
-                        <strong>${data.sender}</strong>
-                        <span style="color: #1db954; font-weight: bold;">Только что!</span>
-                    </div>
-                    ${contentHtml}
-                    <div class="msg-actions">
-                        <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
-                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
-                            <input type="hidden" name="status" value="in_progress">
-                            <button type="submit" class="btn btn-secondary btn-small">В работу</button>
-                        </form>
-                        <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
-                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
-                            <input type="hidden" name="status" value="done">
-                            <button type="submit" class="btn btn-success btn-small">Завершить</button>
-                        </form>
-                    </div>
-                </div>
-            `;
-            
-            if (msgList) {
-                msgList.insertAdjacentHTML('afterbegin', newHtml);
-            }
-        }
-    };
-</script>
 {% endif %}
-
-<!-- =================================================== -->
-<!-- ГЛОБАЛЬНЫЕ СКРИПТЫ (Работают всегда, даже без сессии) -->
-<!-- =================================================== -->
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(function(alert) {
-            setTimeout(function() {
-                alert.classList.add('fade-out');
-                setTimeout(function() {
-                    alert.remove();
-                }, 500); 
-            }, 3000);
+const sessionId = "{{ session.id }}";
+const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+const socket = new WebSocket(wsProtocol + window.location.host + "/ws/stream/" + sessionId + "/");
+
+let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
+const isLooping = {{ session.is_looping|yesno:"true,false" }};
+
+let currentTrackId = null;
+let currentTrackUrl = "";
+
+const hostGhostPlayer = new Audio();
+hostGhostPlayer.muted = true;
+
+// ==========================================
+// Работа с плейлистом
+// ==========================================
+function getPlaylistTracks() {
+    const buttons = document.querySelectorAll('.play-track-btn');
+    const tracks = [];
+
+    buttons.forEach(btn => {
+        tracks.push({
+            id: parseInt(btn.dataset.trackId),
+            url: btn.dataset.trackUrl
         });
     });
+
+    return tracks;
+}
+
+function playTrack(trackId, fileUrl) {
+    currentTrackId = trackId;
+    currentTrackUrl = fileUrl;
+
+    socket.send(JSON.stringify({
+        action: 'change_track',
+        track_id: trackId,
+        url: fileUrl
+    }));
+
+    hostGhostPlayer.src = fileUrl;
+    hostGhostPlayer.load();
+
+    if (!isPlaying) {
+        toggleStream();
+    } else {
+        hostGhostPlayer.play().catch(err => {
+            console.log("Ghost player play error:", err);
+        });
+    }
+}
+
+function playNextTrack() {
+    const tracks = getPlaylistTracks();
+    if (tracks.length === 0) return;
+
+    let currentIndex = tracks.findIndex(track => track.id === currentTrackId);
+
+    // если текущий не найден, стартуем с первого
+    if (currentIndex === -1) {
+        playTrack(tracks[0].id, tracks[0].url);
+        return;
+    }
+
+    let nextIndex = currentIndex + 1;
+
+    if (nextIndex >= tracks.length) {
+        if (isLooping) {
+            nextIndex = 0;
+        } else {
+            return;
+        }
+    }
+
+    playTrack(tracks[nextIndex].id, tracks[nextIndex].url);
+}
+
+hostGhostPlayer.onended = function() {
+    playNextTrack();
+};
+
+// ==========================================
+// Управление эфиром
+// ==========================================
+function toggleStream() {
+    socket.send(JSON.stringify({ action: 'play' }));
+    socket.send(JSON.stringify({ action: 'pause' }));
+}
+
+// ==========================================
+// Приём websocket событий
+// ==========================================
+socket.onmessage = function(e) {
+    const data = JSON.parse(e.data);
+
+    if (data.event_type === 'new_message') {
+        const msgList = document.getElementById('active-messages-list');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        let contentHtml = "";
+        if (data.text && data.text.length > 0) {
+            contentHtml = `<p style="font-size: 14px; margin-bottom: 5px;">${data.text}</p>`;
+        } else if (data.voice_url && data.voice_url.length > 0) {
+            contentHtml = `<audio controls src="${data.voice_url}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>`;
+        }
+
+        const newHtml = `
+            <div class="msg-card" style="border-left-color: #1db954;">
+                <div class="msg-header">
+                    <strong>${data.sender}</strong>
+                    <span style="color: #1db954; font-weight: bold;">Только что!</span>
+                </div>
+                ${contentHtml}
+                <div class="msg-actions">
+                    <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
+                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                        <input type="hidden" name="status" value="in_progress">
+                        <button type="submit" class="btn btn-secondary btn-small">В работу</button>
+                    </form>
+                    <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
+                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                        <input type="hidden" name="status" value="done">
+                        <button type="submit" class="btn btn-success btn-small">Завершить</button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        if (msgList) {
+            msgList.insertAdjacentHTML('afterbegin', newHtml);
+        }
+    }
+};
+
+socket.onclose = function() {
+    console.error("WebSocket соединение с эфиром потеряно.");
+};
+
+// ==========================================
+// Запись голоса ведущего
+// ==========================================
+let mediaRecorder;
+let audioChunks = [];
+let voiceBlob = null;
+
+const btnRecStart = document.getElementById('btn-rec-start');
+const micActions = document.getElementById('mic-actions');
+
+if (btnRecStart) {
+    btnRecStart.onclick = async () => {
+        if (btnRecStart.innerText.includes("Начать")) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+                mediaRecorder.onstop = () => {
+                    voiceBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                    stream.getTracks().forEach(t => t.stop());
+                    btnRecStart.style.display = 'none';
+                    micActions.style.display = 'flex';
+                };
+
+                mediaRecorder.start();
+                btnRecStart.innerText = "⏹ Остановить запись";
+                btnRecStart.classList.remove('btn-danger');
+                btnRecStart.classList.add('btn-secondary');
+            } catch (err) {
+                alert("Нет доступа к микрофону!");
+            }
+        } else {
+            mediaRecorder.stop();
+        }
+    };
+}
+
+function sendHostVoice(actionType) {
+    if (!voiceBlob) return;
+
+    if (actionType === 'live' && !isPlaying) {
+        alert('❌ Ошибка: Вы не можете сказать в эфир, пока он находится на паузе! Сначала снимите эфир с паузы.');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('voice_blob', voiceBlob, 'host_voice.webm');
+    fd.append('action_type', actionType);
+
+    fetch('/host/upload-voice/', {
+        method: 'POST',
+        body: fd
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Ошибка загрузки голоса");
+        }
+        return response.json();
+    })
+    .then(() => {
+        micActions.style.display = 'none';
+        btnRecStart.style.display = 'block';
+        btnRecStart.innerText = "⏺ Начать запись";
+        btnRecStart.classList.remove('btn-secondary');
+        btnRecStart.classList.add('btn-danger');
+        voiceBlob = null;
+
+        if (actionType === 'playlist') {
+            location.reload();
+        } else {
+            alert('Голос отправлен в прямой эфир!');
+            location.reload();
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Не удалось отправить голос.");
+    });
+}
+
+const btnSendPlaylist = document.getElementById('btn-send-playlist');
+const btnSendLive = document.getElementById('btn-send-live');
+
+if (btnSendPlaylist) {
+    btnSendPlaylist.onclick = () => sendHostVoice('playlist');
+}
+
+if (btnSendLive) {
+    btnSendLive.onclick = () => sendHostVoice('live');
+}
+const masterVolumeSlider = document.getElementById('master-volume-slider');
+let masterVolume = 1.0;
+
+if (masterVolumeSlider) {
+    masterVolumeSlider.addEventListener('input', function() {
+        masterVolume = parseInt(this.value) / 100;
+
+        // Для ghost player это не критично, он muted, но пусть будет консистентно
+        hostGhostPlayer.volume = masterVolume;
+
+        socket.send(JSON.stringify({
+            action: 'set_volume',
+            volume: masterVolume
+        }));
+    });
+}
 </script>
 {% endblock %}

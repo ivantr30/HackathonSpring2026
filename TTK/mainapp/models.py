@@ -63,13 +63,11 @@ class MediatekElement(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mediatekelements')
     name = models.CharField(max_length=100)
     def url(self):
-        try:
+        if hasattr(self, 'audio') and self.audio.audio_file:
             return self.audio.audio_file.url
-        except:
-            try:
-                return self.video.video_file.url
-            except:
-                return ""
+        if hasattr(self, 'video') and self.video.video_file:
+            return self.video.video_file.url
+        return ""
     
 class Session(models.Model):
     title = models.CharField(max_length=50)
@@ -81,6 +79,7 @@ class Session(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sessions')
     is_looping = models.BooleanField(default=False)
     is_shuffled = models.BooleanField(default=False)
+    master_volume = models.FloatField(default=1.0)
 
     def get_state(self):
         if not self.current_track:
