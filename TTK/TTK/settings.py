@@ -31,12 +31,14 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "mainapp",
 ]
 
@@ -70,10 +72,27 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "TTK.wsgi.application"
+ASGI_APPLICATION = "TTK.asgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+
+# ДЕБАГ ВРЕМЯНКА!!!!!
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [('127.0.0.1', 6379)],   # Redis должен быть запущен
+#         },
+#     },
+# }
 
 DATABASES = {
     "default": {

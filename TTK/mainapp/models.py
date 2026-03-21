@@ -48,6 +48,7 @@ class Message(models.Model):
 class Session(models.Model):
     title = models.CharField(max_length=50)
     elements = models.ManyToManyField(Message, related_name='sessions', blank=True)
+    is_paused = models.BooleanField(default=False)
     def __str__(self):
         return self.title[:20]
 
