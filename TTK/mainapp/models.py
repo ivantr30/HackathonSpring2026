@@ -3,6 +3,7 @@ from django.core.validators import FileExtensionValidator, RegexValidator
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 # Create your models here.
 # Роли реализованны через django groups, пример в admin.py
@@ -33,7 +34,6 @@ class User(AbstractUser):
 
 
 class Message(models.Model):
-    
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='messages')
     host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='receivedmessages')
     STATUS_CHOICES = [
@@ -42,16 +42,10 @@ class Message(models.Model):
         ('done', 'Завершено'),
     ]
     state = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    creation_time = models.DateTimeField()
     def __str__(self):
         return self.sender.__str__()
     
-class Session(models.Model):
-    title = models.CharField(max_length=50)
-    elements = models.ManyToManyField(Message, related_name='sessions', blank=True)
-    is_paused = models.BooleanField(default=False)
-    def __str__(self):
-        return self.title[:20]
-
 class VoiceMessage(Message):
     voice_message = models.FileField(
         upload_to='voice/', 
@@ -68,6 +62,36 @@ class TextMessage(Message):
 class MediatekElement(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mediatekelements')
     name = models.CharField(max_length=100)
+
+    
+class Session(models.Model):
+    title = models.CharField(max_length=50)
+    elements = models.ManyToManyField(Message, related_name='sessions', blank=True, null=True)
+    is_playing = models.BooleanField(default=False)
+    current_track_start_time = models.DateTimeField(null=True, blank=True)
+    current_track_paused_time = models.FloatField(default=0.0, null=True, blank=True)
+    current_track = models.ForeignKey(MediatekElement, on_delete=models.SET_NULL, null=True, blank=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sessions')
+
+    def get_state(self):
+        if not self.current_track:
+            return {"current_track" : None, "position" : 0, "is_playing" : False}
+        
+        position = self.current_track_paused_time
+        if self.is_playing and self.current_track:
+            time_elapsed = (timezone.now() - self.current_track_start_time).total_seconds()
+            position += time_elapsed
+
+        return {
+            "current_track" : self.current_track,
+            "position" : position,
+            "is_playing" : self.is_playing,
+            "server_time" : timezone.now().isoformat()
+        }
+
+    def __str__(self):
+        return self.title[:20]
+
 
 class Playlist(models.Model):
     title = models.CharField(max_length=100)

@@ -1,16 +1,52 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Вход{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/login.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="welcome-card">
-    <h1>Вход в TTKstream</h1>
-    <form method="post">
-        {% csrf_token %}
-        {{form.as_p}}
-        {% if request.GET.next %}
-            <input type="hidden" name="next" value="{{ request.GET.next }}">
-        {% endif %}
-        <button type="submit">Войти</button>
-    </form>
-    <p>Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a></p>
+<div class="login-container">
+    <div class="auth-card">
+        <span class="auth-logo">ПОТОК</span>
+        <h1>Вход в личный кабинет</h1>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+                <div class="alert alert-error">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="form-group">
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="alert alert-error">
+                        {{ form.username.errors|first }}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="alert alert-error">
+                        {{ form.password.errors|first }}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <button type="submit">Войти</button>
+        </form>
+        
+        <div class="link">
+            Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a>
+        </div>
+    </div>
 </div>
 {% endblock %}

@@ -1,29 +1,28 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-class StreamConsumer(AsyncWebsocketConsumer):
+class StreamListener(AsyncWebsocketConsumer):
     async def connect(self):
-        self.room_group_name = 'live_stream'
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        self.room_name = "some_room"
+        await self.channel_layer.group_add(self.room_name, self.channel_name)
         await self.accept()
-
+    
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-
+        await self.channel_layer.group_discard(self.room_name, self.channel_name)
+    
     async def receive(self, text_data):
         data = json.loads(text_data)
-        # Рассылаем команду всем в комнате
+        message = data['message']
+
         await self.channel_layer.group_send(
-            self.room_group_name,
+            self.room_name,
             {
-                'type': 'stream_event',
-                'event_type': data['event_type'],
-                'payload': data.get('payload', {})
+                'type' : 'broadcast_message',
+                'text' : message,
             }
         )
-
-    async def stream_event(self, event):
+    async def broadcast_message(self, event):
         await self.send(text_data=json.dumps({
-            'event_type': event['event_type'],
-            'payload': event['payload']
+            'server' : event['text']
         }))
+    

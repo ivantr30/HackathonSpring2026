@@ -1,112 +1,20 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Player{% endblock %} 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static '/css/Player.css' %}">
+{% endblock %}
+{% block content %}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Плеер</title>
-    <style>
-        body { background: #121212; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
-        .player-box { background: #1e1e1e; width: 400px; margin: 0 auto; padding: 30px; border-radius: 15px; }
-        .pause-banner { background: #f1c40f; color: black; padding: 10px; border-radius: 5px; font-weight: bold; display: none; margin-bottom: 20px;}
-        textarea { width: 100%; height: 80px; margin-top: 20px; }
-        .btn { padding: 10px; background: #1db954; border: none; color: white; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 5px;}
-        .btn-red { background: #e74c3c; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 </head>
 <body>
-
-    <div class="player-box">
-        <h2>Радио Эфир</h2>
-        
-        <div id="pause-banner" class="pause-banner">⏸ Эфир приостановлен ведущим</div>
-        
-        <!-- Заглушка аудио. Ведущий может переключать треки через JS, но пока оставим статику -->
-        <audio id="main-audio" controls src="" style="width: 100%;"></audio>
-
-        <hr style="border-color:#333; margin: 20px 0;">
-
-        <h3>Написать в студию</h3>
-        <textarea id="text-msg" placeholder="Ваш текст..."></textarea>
-        <button onclick="sendText()" class="btn">Отправить текст</button>
-
-        <button id="btn-record-voice" class="btn btn-red" style="margin-top: 15px;">🎙️ Записать голосовое</button>
-    </div>
-
-    <script>
-        // ================= 1. WEBSOCKETS (Слушаем ведущего) =================
-        const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-        const socket = new WebSocket(wsProtocol + window.location.host + '/ws/stream/');
-        
-        const mainAudio = document.getElementById('main-audio');
-        const pauseBanner = document.getElementById('pause-banner');
-
-        socket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            
-            if (data.event_type === 'pause') {
-                pauseBanner.style.display = 'block';
-                mainAudio.pause();
-            } 
-            else if (data.event_type === 'play') {
-                pauseBanner.style.display = 'none';
-                mainAudio.play(); // Можно добавить авто-продолжение
-            }
-            // ==========================================
-            // НОВОЕ: ВЕДУЩИЙ ВКЛЮЧИЛ НОВЫЙ ТРЕК ИЗ БАЗЫ
-            // ==========================================
-            else if (data.event_type === 'change_track') {
-                mainAudio.src = data.payload.url; // Ставим ссылку на наш mp3 из БД
-                mainAudio.play(); // Запускаем
-            }
-            // ==========================================
-            else if (data.event_type === 'play_host_voice') {
-                mainAudio.pause(); 
-                const hostVoice = new Audio(data.payload.url);
-                hostVoice.play().catch(() => alert("Ведущий в эфире! Кликните по странице, чтобы услышать."));
-                hostVoice.onended = () => {
-                    if (pauseBanner.style.display === 'none') mainAudio.play(); 
-                };
-            }
-        };
-
-        // ================= 2. ОТПРАВКА СООБЩЕНИЙ ВЕДУЩЕМУ =================
-        function sendText() {
-            const text = document.getElementById('text-msg').value;
-            const fd = new FormData();
-            fd.append('text', text);
-            fetch('/user/send_message/', { method: 'POST', body: fd }).then(() => alert('Текст отправлен!'));
-        }
-
-        // Запись голосового от слушателя
-        let userRecorder, userChunks = [];
-        const btnVoice = document.getElementById('btn-record-voice');
-        let isRecording = false;
-
-        btnVoice.onclick = async () => {
-            if (!isRecording) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                userRecorder = new MediaRecorder(stream);
-                userRecorder.start();
-                userChunks = [];
-                userRecorder.ondataavailable = e => userChunks.push(e.data);
-                
-                isRecording = true;
-                btnVoice.innerText = "⏹ Остановить и отправить";
-            } else {
-                userRecorder.stop();
-                userRecorder.stream.getTracks().forEach(t => t.stop());
-                isRecording = false;
-                
-                userRecorder.onstop = () => {
-                    const blob = new Blob(userChunks, { type: 'audio/mp3' });
-                    const fd = new FormData();
-                    fd.append('voice_blob', blob, 'user_voice.mp3');
-                    fetch('/user/send_message/', { method: 'POST', body: fd }).then(() => {
-                        btnVoice.innerText = "🎙️ Записать голосовое";
-                        alert('Голосовое отправлено!');
-                    });
-                };
-            }
-        };
-    </script>
+    <h1>Player</h1>
 </body>
 </html>
+{% endblock %}

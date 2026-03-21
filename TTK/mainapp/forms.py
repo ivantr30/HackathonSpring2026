@@ -1,6 +1,7 @@
 import re
-from .models import User
+from .models import User, Session
 from django.contrib.auth.forms import UserCreationForm
+from django import forms
 
 class RegistrationForm(UserCreationForm):
     class Meta:
@@ -14,3 +15,7 @@ class RegistrationForm(UserCreationForm):
                 self.add_error('password1', "Пароль может содержать только латинские буквы, цифры и символы.")
                 
         return cleaned_data
+class SessionForm(forms.ModelForm):
+    class Meta:
+        model = Session
+        fields = ["title"]
