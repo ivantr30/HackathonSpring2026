@@ -4,7 +4,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.models import Group 
-from .models import Audio, Video, MediatekElement, Playlist
+from .models import Audio, Video, MediatekElement, Playlist, Session
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
@@ -16,13 +16,21 @@ def user_is_host(request):
 def user_is_admin(request):
     return request.user.groups.filter(name="Админ").exists() or request.user.is_superuser
 
+from django.shortcuts import render, get_object_or_404
+
 @login_required
-def player(request):
-    return render(request, 'player.html')
+def player_lobby(request):
+    active_sessions = Session.objects.all().order_by('-id')
+    return render(request, 'player_lobby.html', {'active_sessions': active_sessions})
+
+@login_required
+def player_room(request, session_id):
+    selected_session = get_object_or_404(Session, id=session_id)
+    return render(request, 'player.html', {'session': selected_session})
 @login_required
 def host(request):
     if not user_is_host(request):
-        return redirect('player')
+        return redirect('player_lobby')
     
     if not request.user.sessions.exists():
         if request.method == "POST":
@@ -91,13 +99,13 @@ def upload_media(request):
                         messages.error(request, f"Ошибка загрузки: {error}")
 
         return redirect('host')
-    return redirect('player')
+    return redirect('player_lobby')
 
 
 def register(request):
 
     if request.user.is_authenticated:
-        return redirect('player')
+        return redirect('player_lobby')
     
     if request.method == "POST":
         form = RegistrationForm(request.POST)
@@ -114,7 +122,7 @@ def register(request):
 def login_view(request):
 
     if request.user.is_authenticated:
-        return redirect('player')
+        return redirect('player_lobby')
     
     if request.method == "POST":
         form = CustomLoginForm(request.POST, data=request.POST)
@@ -130,7 +138,7 @@ def logout_view(request):
     if request.method == 'POST':
         logout(request) 
         return redirect('login') 
-    return player(request)
+    return redirect("player_lobby")
 
 def redirect_if_user_wasnt_auth(request, user):
     login(request, user) 
@@ -143,11 +151,11 @@ def redirect_if_user_wasnt_auth(request, user):
     ):
         return redirect(next_url)
     else:
-        return redirect('player')
+        return redirect('player_lobby')
 @login_required
 def add_to_playlist(request, item_id):
     if not user_is_host(request):
-        return redirect("player")
+        return redirect("player_lobby")
     if request.method == "POST":
         item = get_object_or_404(MediatekElement, id=item_id, owner=request.user)
         
@@ -160,7 +168,7 @@ def add_to_playlist(request, item_id):
 @login_required
 def remove_from_playlist(request, item_id):
     if not user_is_host(request):
-        return redirect("player")
+        return redirect("player_lobby")
     if request.method == "POST":
         item = get_object_or_404(MediatekElement, id=item_id, owner=request.user)
         playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
@@ -201,4 +209,31 @@ def toggle_loop(request):
         if session:
             session.is_looping = not session.is_looping
             session.save()
+    return redirect('host')
+@login_required
+def delete_media(request, media_type, media_id):
+    # Разрешаем удалять только через POST-запрос (для безопасности)
+    if request.method == "POST":
+        
+        # Определяем, в какой таблице искать
+        if media_type == 'audio':
+            # Находим файл, причем ТОЛЬКО если он принадлежит текущему ведущему!
+            media_item = get_object_or_404(Audio, id=media_id, owner=request.user)
+            # Физически удаляем файл с диска
+            if media_item.audio_file:
+                media_item.audio_file.delete(save=False)
+                
+        elif media_type == 'video':
+            media_item = get_object_or_404(Video, id=media_id, owner=request.user)
+            if media_item.video_file:
+                media_item.video_file.delete(save=False)
+        else:
+            return redirect('host')
+
+        # Удаляем запись из базы данных (при этом трек автоматически исчезнет и из плейлиста, если он там был)
+        name = media_item.name
+        media_item.delete()
+        
+        messages.success(request, f"Файл '{name}' успешно удален из медиатеки.")
+        
     return redirect('host')

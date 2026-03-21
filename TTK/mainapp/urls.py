@@ -5,8 +5,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 
-urlpatterns = [
-    path("", views.player, name="player"),
+urlpatterns = [ 
+    path("", views.player_lobby, name="player_lobby"), 
+    path("player/<int:session_id>/", views.player_room, name="player_room"), 
     path("host", views.host, name="host"),
     path("host/upload-media", views.upload_media, name="upload_media"),
     path("register", views.register, name="register"),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('host/playlist/remove/<int:item_id>/', views.remove_from_playlist, name='remove_from_playlist'),
     path('host/toggle-shuffle/', views.toggle_shuffle, name='toggle_shuffle'),
     path('host/toggle-loop/', views.toggle_loop, name='toggle_loop'),
+    path('host/delete-media/<str:media_type>/<int:media_id>/', views.delete_media, name='delete_media'),
 ]
 
 if settings.DEBUG:
