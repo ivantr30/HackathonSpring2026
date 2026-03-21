@@ -24,10 +24,15 @@
     border-radius: 4px;
 }
 
-.module-link.active,
+.module-link.active {
+    color: #ff0000;
+    border-bottom: 3px solid #ff0000;
+    background: none;
+}
+
 .module-link:hover {
-    background: #34495e;
-    color: white;
+    background: #f8f9fa;
+    color: #ff0000;
 }
 
 .admin-main {
@@ -212,4 +217,95 @@
 
 .module-icon {
     font-size: 1.2rem;
+}
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .admin-nav {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .admin-modules {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .module-link {
+        padding: 0.75rem 1rem;
+        justify-content: flex-start;
+    }
+
+    .admin-main {
+        padding: 1rem;
+    }
+
+    .filter-row {
+        flex-direction: column;
+    }
+
+    .filter-field {
+        min-width: 100%;
+    }
+
+    .filter-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-actions button,
+    .filter-actions a {
+        width: 100%;
+        text-align: center;
+    }
+
+    .users-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .users-table th,
+    .users-table td {
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .user-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .action-btn {
+        font-size: 1rem;
+        padding: 0.25rem;
+    }
+
+    .modal-content {
+        margin: 5% auto;
+        padding: 1.5rem;
+        max-width: 90%;
+    }
+
+    .help-text {
+        padding: 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .empty-state {
+        padding: 2rem !important;
+    }
+
+    .empty-icon {
+        font-size: 2rem;
+    }
+
+    .empty-state-content h3 {
+        font-size: 1.25rem;
+    }
+
+    .empty-state-content p {
+        font-size: 0.9rem;
+    }
 }

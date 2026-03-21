@@ -54,6 +54,13 @@ nav ul li a {
 nav ul li a:hover {
     color: #ff0000;
 }
+
+nav ul li a.active {
+    color: #ff0000;
+    border-bottom: 3px solid #ff0000;
+    padding-bottom: 5px;
+}
+
 nav ul li form {
     display: inline;
 }
@@ -146,3 +153,49 @@ footer {
     width: 100%;
 }
 
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    nav {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 0 1rem;
+    }
+
+    nav ul {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    nav ul li a {
+        display: block;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        background: #f8f9fa;
+    }
+
+    .btn-logout {
+        width: 100%;
+        text-align: center;
+    }
+
+    main {
+        padding: 20px 1rem;
+    }
+
+    .messages {
+        margin: 0 auto 10px;
+    }
+
+    .alert {
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+
+    footer {
+        padding: 15px;
+        font-size: 0.9rem;
+    }
+}
