@@ -8,13 +8,13 @@
 {% endblock %}
 
 {% block content %}
+<!-- ШАПКА: ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ ЭФИРА -->
 <div class="dashboard-header">
     <div>
-        <h1 style="margin-bottom: 5px;">🎛️ Управление эфиром</h1>
-        <p style="color: #666; font-size: 14px;">Панель ведущего</p>
+        <h1 style="margin-bottom: 5px;">🎛️ Панель управления эфиром</h1>
+        <p style="color: #666; font-size: 14px;">Режимы: Аудио, Видео, Интерактив</p>
     </div>
 
-    <!-- ТВОЙ БЛОК: УПРАВЛЕНИЕ СЕССИЕЙ (Не тронуто логически, только обернуто в CSS) -->
     <div class="session-controls">
         {% if not has_session %}
             <form method="post" class="create-session-form">
@@ -24,136 +24,163 @@
             </form>
         {% endif %}
         
-        <!-- Кнопка старта/паузы -->
-        <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}">
-            {% if not is_playing %}Начать эфир{% else %}Приостановить эфир{% endif %}
+        <!-- Главный переключатель из ТЗ -->
+        <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}" style="font-size: 16px; padding: 12px 20px;">
+            {% if not is_playing %}▶ Начать эфир{% else %}⏸ Приостановить эфир{% endif %}
         </button>
     </div>
 </div>
 
 <div class="dashboard-grid">
 
-    <!-- КОЛОНКА 1: МЕДИАТЕКА И ПЛЕЙЛИСТ -->
+    <!-- КОЛОНКА 1: МЕДИАТЕКА И ПЛЕЙЛИСТ (По ТЗ) -->
     <div class="panel">
-        <h2>📁 Медиатека и Плейлист</h2>
+        <h2>📁 Работа с медиа</h2>
         
-        <!-- Форма загрузки (ТЗ: Загрузка с ПК до 50МБ/1000МБ) -->
-        <form action="#" method="POST" enctype="multipart/form-data" class="form-group">
+        <!-- Загрузка с ПК (с указанием ограничений из ТЗ) -->
+        <form method="POST" enctype="multipart/form-data" class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px;">
             {% csrf_token %}
-            <input type="text" name="name" class="form-control" placeholder="Название трека/видео" required>
+            <h3 style="margin-top:0;">📤 Загрузить файл с ПК</h3>
+            <input type="text" name="name" class="form-control" placeholder="Название файла" required>
             <select name="file_type" class="form-control">
-                <option value="audio">Аудио (MP3, WAV, OGG)</option>
-                <option value="video">Видео (MP4, WebM)</option>
+                <option value="audio">Аудио (MP3, WAV, OGG) — до 50 Мб</option>
+                <option value="video">Видео (MP4, WebM) — до 1000 Мб</option>
             </select>
             <input type="file" name="media_file" class="form-control" required>
-            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">📥 Загрузить файл</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Загрузить в медиатеку</button>
         </form>
+
+        <!-- Плейлист (Очередь воспроизведения) -->
+        <h3>📻 Текущий плейлист (Очередь)</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔀 Shuffle</button>
+            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔁 Зациклить</button>
+        </div>
+        
+        <div class="media-list" style="background: #f0fff4;">
+            <div class="media-item playlist-item">
+                <span>1. 🎵 Баста - Выпускной.mp3</span>
+                <div>
+                    <button class="btn btn-success btn-small">▶ Играть</button>
+                    <button class="btn btn-danger btn-small">✕</button>
+                </div>
+            </div>
+        </div>
 
         <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
 
-        <!-- Управление плейлистом (ТЗ: Shuffle, Зацикливание) -->
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <button class="btn btn-secondary" style="flex: 1;">🔀 Shuffle</button>
-            <button class="btn btn-secondary" style="flex: 1;">🔁 Зациклить</button>
+        <!-- Личная медиатека (Хранилище) -->
+        <h3>📚 Ваша медиатека</h3>
+        <div class="media-list">
+            <!-- Пример элемента. Backend: цикл for audio in my_media -->
+            <div class="media-item">
+                <span>🎵 Баста - Выпускной.mp3</span>
+                <button class="btn btn-primary btn-small">+ В очередь</button>
+            </div>
+            <div class="media-item">
+                <span>🎬 Заставка_Шоу.mp4</span>
+                <button class="btn btn-primary btn-small">+ В очередь</button>
+            </div>
         </div>
 
-        <!-- Список треков -->
-        <div class="media-list">
-            <!-- Пример элемента списка (Подставь сюда свой цикл for) -->
-            <div class="media-item">
-                <span>🎵 Пример трека.mp3</span>
-                <button class="btn btn-success" style="padding: 5px 10px;">В эфир</button>
-            </div>
-            <div class="media-item">
-                <span>🎬 Видео_заставка.mp4</span>
-                <button class="btn btn-success" style="padding: 5px 10px;">В эфир</button>
-            </div>
-        </div>
     </div>
 
-    <!-- КОЛОНКА 2: ПРЯМЫЕ ВКЛЮЧЕНИЯ (Webcam & Mic) -->
+    <!-- КОЛОНКА 2: ПРЯМЫЕ ВКЛЮЧЕНИЯ И НАСТРОЙКИ (По ТЗ) -->
     <div class="panel">
-        <h2>🔴 Прямые включения</h2>
+        <h2>🎙️ Прямой эфир (Live)</h2>
 
-        <!-- ТЗ: Запись звука с микрофона -->
-        <div class="form-group">
-            <p style="font-size: 14px; color: #666; margin-bottom: 10px;">Запишите сообщение и отправьте его сразу в эфир или в плейлист.</p>
-            <button class="btn btn-danger" style="width: 100%;">🎙️ Записать аудио</button>
+        <!-- Управление громкостью -->
+        <h3>🔊 Общая громкость эфира (Master)</h3>
+        <div class="volume-control">
+            <span>🔈</span>
+            <input type="range" min="0" max="100" value="100">
+            <span>🔊</span>
         </div>
 
         <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
 
-        <!-- ТЗ: Видеотрансляция (вебкам) -->
-        <h3>📹 Видеотрансляция</h3>
+        <!-- Работа с микрофоном -->
+        <h3>🎙️ Микрофон (Аудиосообщение)</h3>
+        <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Запишите голос, чтобы добавить его в плейлист или сразу запустить слушателям.</p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button class="btn btn-danger">⏺ Записать аудио</button>
+            <button class="btn btn-primary">Отправить в плейлист</button>
+            <button class="btn btn-success">▶ В эфир (Микширование)</button>
+        </div>
+
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
+
+        <!-- Видеотрансляция (ДОП ТЗ) -->
+        <h3>📹 Видеотрансляция (Вебкам-эфир)</h3>
         <div class="webcam-container">
-            <span id="webcam-placeholder">Камера выключена</span>
-            <video id="webcam-preview" autoplay muted></video>
+            <span>Камера выключена</span>
+            <!-- Сюда JS будет транслировать поток с вебки -->
+            <video id="webcam-preview" autoplay muted style="display: none; width: 100%; height: 100%; object-fit: cover;"></video>
         </div>
         <div style="display: flex; gap: 10px;">
             <button class="btn btn-primary" style="flex: 1;">Включить видео</button>
-            <button class="btn btn-danger" style="flex: 1;">Остановить</button>
+            <button class="btn btn-secondary" style="flex: 1;">Остановить</button>
         </div>
     </div>
 
-    <!-- КОЛОНКА 3: СООБЩЕНИЯ ОТ ПОЛЬЗОВАТЕЛЕЙ -->
+    <!-- КОЛОНКА 3: УПРАВЛЕНИЕ СООБЩЕНИЯМИ (По ТЗ) -->
     <div class="panel">
         <h2>📨 Сообщения пользователей</h2>
 
-        <!-- Активные сообщения -->
-        <h3 style="font-size: 14px; color: #666;">Активные:</h3>
-        <div class="media-list" style="margin-top: 5px; margin-bottom: 20px;">
+        <!-- Активные (Новый, В работе) -->
+        <h3>Новые и в работе:</h3>
+        <div class="media-list" style="max-height: 350px; background: white; border: none; padding: 0;">
             
-            <!-- Пример Нового сообщения -->
+            <!-- Пример сообщения "Новый" -->
             <div class="msg-card">
                 <div class="msg-header">
-                    <strong>Иван Иванов</strong>
-                    <span style="color: #ff0000; font-weight: bold;">Новое</span>
+                    <strong>Слушатель_1</strong>
+                    <span style="color: #ff0000; font-weight: bold;">Новый</span>
                 </div>
-                <p style="font-size: 14px; margin-bottom: 5px;">Поставьте, пожалуйста, трек AC/DC!</p>
+                <p style="font-size: 14px; margin-bottom: 5px;">Поставьте мой любимый трек!</p>
                 <div class="msg-actions">
-                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">В работу</button>
-                    <button class="btn btn-success" style="padding: 4px 8px; font-size: 12px;">Завершить</button>
+                    <button class="btn btn-secondary btn-small">В работу</button>
+                    <button class="btn btn-success btn-small">Завершить</button>
                 </div>
             </div>
 
-            <!-- Пример В работе -->
+            <!-- Пример сообщения "В работе" (Голосовое) -->
             <div class="msg-card in-progress">
                 <div class="msg-header">
-                    <strong>Слушатель_123</strong>
-                    <span style="color: #f1c40f; font-weight: bold;">В работе</span>
+                    <strong>Аня</strong>
+                    <span style="color: #d35400; font-weight: bold;">В работе (В эфире)</span>
                 </div>
+                <!-- Плеер для прослушивания голосового от юзера -->
                 <audio controls style="width: 100%; height: 30px; margin-top: 5px;"></audio>
                 <div class="msg-actions">
-                    <button class="btn btn-success" style="padding: 4px 8px; font-size: 12px;">Завершить</button>
+                    <button class="btn btn-success btn-small">Завершить</button>
                 </div>
             </div>
-
         </div>
 
         <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
 
-        <!-- Архив (Завершенные) -->
-        <h3 style="font-size: 14px; color: #666;">🗄️ Архив (Завершенные):</h3>
-        <div class="media-list" style="margin-top: 5px; max-height: 150px;">
+        <!-- Архив (Завершено) -->
+        <h3>🗄️ Архив (Завершенные):</h3>
+        <div class="media-list" style="max-height: 200px; background: white; border: none; padding: 0;">
             <div class="msg-card done">
                 <div class="msg-header">
-                    <strong>Анна</strong>
+                    <strong>Иван Иванов</strong>
                     <span>Завершено</span>
                 </div>
-                <p style="font-size: 14px; margin: 0;">Привет ведущему!</p>
+                <p style="font-size: 14px; margin: 0;">Привет радио!</p>
             </div>
         </div>
-
     </div>
 
 </div>
 
-<!-- ТВОЙ ФЛАГ (Не тронуто) -->
+<!-- ФЛАГ СОСТОЯНИЯ ЭФИРА ИЗ DJANGO -->
 {{ is_playing|json_script:"is_playing-flag" }}
 
-<!-- ТВОЙ СКРИПТ (Абсолютно не тронуто, только отформатировано) -->
-<script> 
-    const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream"); 
+<!-- ТВОЙ СОХРАНЕННЫЙ СКРИПТ (Без изменений логики) -->
+<script>
+    const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream");
     let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
 
     function toggleStream() {
@@ -162,12 +189,12 @@
         let action = "";
         
         if (isPlaying) {
-            streamtoggler.innerText = "Приостановить эфир";
-            streamtoggler.classList.replace('btn-success', 'btn-danger'); // Для визуала
+            streamtoggler.innerText = "⏸ Приостановить эфир";
+            streamtoggler.classList.replace('btn-success', 'btn-danger'); 
             action = "play";
         } else {
-            streamtoggler.innerText = "Начать эфир";
-            streamtoggler.classList.replace('btn-danger', 'btn-success'); // Для визуала
+            streamtoggler.innerText = "▶ Начать эфир";
+            streamtoggler.classList.replace('btn-danger', 'btn-success'); 
             action = "pause";
         }
         
