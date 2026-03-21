@@ -6,13 +6,33 @@
         <title>Document</title>
     </head>
     <body>
-        <button onclick="createStream()"> Создать эфир</button>
+        {% if not has_session %}
+        <form method="post">
+            {% csrf_token%}
+            {{ form.as_p }}
+            <button type="submit"> Создать эфир</button>
+        </form>
+        {% elif not is_playing%}
+        <button onclick="toggleStream()" id="streamToggler">Начать эфир</button>
+        {% endif %}
+        {{ has_session|json_script:"session-flag" }}
     </body>
     <script>
         const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream")
-
-        function createStream(){
-            
+        let isPlaying = JSON.parse(document.getElementById("session-flag").textContent)
+        
+        function toggleStream(){
+            streamtoggler = document.getElementById("streamtoggler").innerText;
+            isPlaying = !isPlaying
+            if (isPlaying){
+                streamtoggler = "Приостановить эфир"
+            }
+            else{
+                streamtoggler = "Начать эфир"
+            }
+            socket.send(JSON.stringify({
+                'is_playing' : isPlaying
+            }))
         };
     </script>
 </html>

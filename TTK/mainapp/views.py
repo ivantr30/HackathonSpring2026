@@ -1,7 +1,6 @@
 from django.shortcuts import render, redirect
-from .forms import RegistrationForm
+from .forms import RegistrationForm, SessionForm, CustomLoginForm
 from django.contrib.auth import login, logout
-from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.models import Group 
@@ -12,10 +11,22 @@ def player(request):
     return render(request, 'player.html')
 @login_required
 def host(request):
-    if request.user.groups.filter(name="Ведущий").exist():
-        if request.method == "POST":
-            form = 
-        return render(request, 'host.html')
+    if request.user.groups.filter(name="Ведущий").exists() or request.user.is_superuser:
+        if not request.user.sessions.exists():
+            if request.method == "POST":
+                form = SessionForm(request.POST)
+                if form.is_valid():
+                    new_session = form.save(commit=False)
+                    new_session.owner = request.user
+                    new_session.save()
+                else:
+                    return
+                return render(request, 'host.html', {"has_session" : True, "is_playing" : request.user.sessions.all()[0].is_playing})
+            else:
+                form = SessionForm()
+                return render(request, 'host.html', {'form' : form, "has_session" : False, "is_playing" : False})
+        else:
+            return render(request, 'host.html', {"has_session" : True, "is_playing" : request.user.sessions.all()[0].is_playing})
     return redirect('player')
 
 def register(request):
@@ -41,13 +52,13 @@ def login_view(request):
         return redirect('player')
     
     if request.method == "POST":
-        form = AuthenticationForm(request.POST, data=request.POST)
+        form = CustomLoginForm(request.POST, data=request.POST)
 
         if form.is_valid():
             user = form.get_user()
             return redirect_if_user_wasnt_auth(request, user)
     else:
-        form = AuthenticationForm()
+        form = CustomLoginForm()
 
     return render(request, 'login.html', {'form': form})
 def logout_view(request):
