@@ -8,9 +8,12 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("", views.player, name="player"),
     path("host", views.host, name="host"),
+    path("host/upload-media", views.upload_media, name="upload_media"),
     path("register", views.register, name="register"),
     path("login", views.login_view, name="login"),
     path("logout", views.logout_view, name="logout"),
+    path('host/playlist/add/<int:item_id>/', views.add_to_playlist, name='add_to_playlist'),
+    path('host/playlist/remove/<int:item_id>/', views.remove_from_playlist, name='remove_from_playlist'),
 ]
 
 if settings.DEBUG:

@@ -62,7 +62,14 @@ class TextMessage(Message):
 class MediatekElement(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mediatekelements')
     name = models.CharField(max_length=100)
-
+    def url(self):
+        try:
+            return self.audio.audio_file.url
+        except:
+            try:
+                return self.video.video_file.url
+            except:
+                return ""
     
 class Session(models.Model):
     title = models.CharField(max_length=50)

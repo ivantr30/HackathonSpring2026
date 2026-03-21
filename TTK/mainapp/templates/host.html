@@ -38,7 +38,7 @@
         <h2>📁 Работа с медиа</h2>
         
         <!-- Загрузка с ПК (с указанием ограничений из ТЗ) -->
-        <form method="POST" enctype="multipart/form-data" class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+        <form action="{% url 'upload_media' %}" method="POST" enctype="multipart/form-data" class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px;">
             {% csrf_token %}
             <h3 style="margin-top:0;">📤 Загрузить файл с ПК</h3>
             <input type="text" name="name" class="form-control" placeholder="Название файла" required>
@@ -53,18 +53,29 @@
         <!-- Плейлист (Очередь воспроизведения) -->
         <h3>📻 Текущий плейлист (Очередь)</h3>
         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔀 Shuffle</button>
+            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔀 Перемещать</button>
             <button class="btn btn-secondary" style="flex: 1; font-size: 12px;">🔁 Зациклить</button>
         </div>
         
         <div class="media-list" style="background: #f0fff4;">
+            
+            {% for item in playlist_elements %}
             <div class="media-item playlist-item">
-                <span>1. 🎵 Баста - Выпускной.mp3</span>
-                <div>
-                    <button class="btn btn-success btn-small">▶ Играть</button>
-                    <button class="btn btn-danger btn-small">✕</button>
+                <span>{{ forloop.counter }}. {{ item.name }}</span>
+                <div style="display: flex; gap: 5px;">
+                    
+                    <button class="btn btn-success btn-small" onclick="playTrack('{{ item.url }}')">▶ Играть</button>
+                    
+                    <form action="{% url 'remove_from_playlist' item.id %}" method="POST" style="margin: 0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-small">✕</button>
+                    </form>
                 </div>
             </div>
+            {% empty %}
+                <p style="text-align: center; color: gray; font-size: 14px; margin-top: 10px;">Очередь пуста</p>
+            {% endfor %}
+            
         </div>
 
         <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
@@ -72,15 +83,32 @@
         <!-- Личная медиатека (Хранилище) -->
         <h3>📚 Ваша медиатека</h3>
         <div class="media-list">
-            <!-- Пример элемента. Backend: цикл for audio in my_media -->
+            
+            {% for audio in my_audio %}
             <div class="media-item">
-                <span>🎵 Баста - Выпускной.mp3</span>
-                <button class="btn btn-primary btn-small">+ В очередь</button>
+                <span>🎵 {{ audio.name }}</span>
+                <form action="{% url 'add_to_playlist' audio.id %}" method="POST" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-small">+ В очередь</button>
+                </form>
             </div>
-            <div class="media-item">
-                <span>🎬 Заставка_Шоу.mp4</span>
-                <button class="btn btn-primary btn-small">+ В очередь</button>
+            {% endfor %}
+
+            <!-- ЦИКЛ: Выводим все загруженные Видео -->
+            {% for video in my_video %}
+             <div class="media-item">
+                <span>🎵 {{ video.name }}</span>
+                <form action="{% url 'add_to_playlist' video.id %}" method="POST" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-small">+ В очередь</button>
+                </form>
             </div>
+            {% endfor %}
+            
+            <!-- Если файлов вообще нет -->
+            {% if not my_audio and not my_video %}
+                <p style="text-align: center; color: gray; font-size: 14px; margin-top: 10px;">Медиатека пуста</p>
+            {% endif %}
         </div>
 
     </div>
@@ -202,5 +230,20 @@
             'action': action,
         }));
     };
+    document.addEventListener("DOMContentLoaded", function() {
+        const alerts = document.querySelectorAll('.alert');
+        
+        alerts.forEach(function(alert) {
+            setTimeout(function() {
+                alert.classList.add('fade-out');
+                
+                setTimeout(function() {
+                    alert.remove();
+                }, 500); 
+                
+            }, 3000);
+        });
+    });
+    </script>
 </script>
 {% endblock %}
