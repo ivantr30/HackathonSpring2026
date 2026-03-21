@@ -1,0 +1,52 @@
+{% extends "admin/base_admin.html" %}
+{% load static %}
+{% block title %} Управление пользователями {% endblock %}
+{% block extra_css %} <link rel="stylesheet" href="{% static 'css/dashboard.css' %}"> {% endblock %}
+{% block admin_content %}
+<div class="admin-dashboard">
+    <h1>Панель управления</h1>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon"></div>
+            <div class="stat-info">
+                <h3>{{ total_users }}</h3>
+                <p>Всего пользователей</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon"></div>
+            <div class="stat-info">
+                <h3>{{ active_users }}</h3>
+                <p>Активных пользователей</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon"></div>
+            <div class="stat-info">
+                <h3>{{ listeners }}</h3>
+                <p>Слушателей</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon"></div>
+            <div class="stat-info">
+                <h3>{{ hosts }}</h3>
+                <p>Ведущих</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="quick-actions">
+        <h2>Быстрые действия</h2>
+        <div class="action-buttons">
+            <a href="{% url 'users' %}" class="action-btn">
+                <span>Управление пользователями</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

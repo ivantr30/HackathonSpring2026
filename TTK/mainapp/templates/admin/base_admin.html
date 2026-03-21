@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+{% load group_tags %}
+
+{% block title %}Администрирование{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- Верхняя навигация модулей -->
+<header class="admin-header">
+    <nav class="admin-nav">
+        <ul class="admin-modules">
+            <li>
+                <a href="{% url 'dashboard' %}" class="module-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <span class="module-icon">📊</span>
+                    <span class="module-name">Дашборд</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'users' %}" class="module-link {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
+                    <span class="module-icon">👥</span>
+                    <span class="module-name">Пользователи</span>
+                </a>
+            </li>
+        </ul>
+        <div class="admin-actions">
+            <a href="{% url 'player' %}" class="btn-back">← На сайт</a>
+        </div>
+    </nav>
+</header>
+
+<main class="admin-main">
+    {% if messages %}
+    <div class="admin-messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+            <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% block admin_content %}{% endblock %}
+</main>
+{% endblock %}

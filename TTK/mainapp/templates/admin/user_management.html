@@ -1,0 +1,115 @@
+{% extends "admin/base_admin.html" %}
+{% load static %}
+
+{% block admin_content %}
+<div class="user-management">
+    <div class="section-header">
+        <h1>Управление пользователями</h1>
+        <span class="user-count">{{ users|length }} пользователей</span>
+    </div>
+    
+    <div class="help-text">
+        <p>Используйте фильтры для поиска пользователей по логину, ФИО, роли или дате регистрации. Для редактирования данных пользователя нажмите на соответствующую кнопку в столбце "Действия".</p>
+    </div>
+    
+    <!-- Панель фильтрации -->
+    <div class="filter-panel">
+        <form method="get" class="filter-form">
+            <div class="filter-row">
+                <div class="filter-field">
+                    <label>{{ filter_form.login.label }}</label>
+                    {{ filter_form.login }}
+                </div>
+                <div class="filter-field">
+                    <label>{{ filter_form.full_name.label }}</label>
+                    {{ filter_form.full_name }}
+                </div>
+                <div class="filter-field">
+                    <label>{{ filter_form.role.label }}</label>
+                    {{ filter_form.role }}
+                </div>
+                <div class="filter-field">
+                    <label>{{ filter_form.date_from.label }}</label>
+                    {{ filter_form.date_from }}
+                </div>
+                <div class="filter-field">
+                    <label>{{ filter_form.date_to.label }}</label>
+                    {{ filter_form.date_to }}
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn-filter">Применить</button>
+                <a href="{% url 'users' %}" class="btn-reset">Сбросить</a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Таблица пользователей -->
+    <div class="table-container">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Логин</th>
+                    <th>ФИО</th>
+                    <th>Роль</th>
+                    <th>Дата регистрации</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td class="user-login">{{ user.username }}</td>
+                    <td class="user-name">{{ user.fullName|default:"—" }}</td>
+                    <td class="user-roles">
+                        {% for group in user.groups.all %}
+                        <span class="role-badge role-{{ group.name|lower }}">{{ group.name }}</span>
+                        {% empty %}
+                        <span class="role-badge role-none">Пользователь</span>
+                        {% endfor %}
+                    </td>
+                    <td class="user-date">{{ user.date_joined|date:"d.m.Y H:i" }}</td>
+                    <td class="user-actions">
+                        <button class="action-btn edit-btn modal-trigger"
+                                data-modal-type="edit-user"
+                                data-user-id="{{ user.id }}"
+                                title="Редактировать">Ред.</button>
+                        <button class="action-btn password-btn modal-trigger"
+                                data-modal-type="change-password"
+                                data-user-id="{{ user.id }}"
+                                title="Сменить пароль">Пароль</button>
+                        <button class="action-btn roles-btn modal-trigger"
+                                data-modal-type="assign-roles"
+                                data-user-id="{{ user.id }}"
+                                title="Назначить роли">Роли</button>
+                        <button class="action-btn delete-btn modal-trigger"
+                                data-modal-type="delete-confirm"
+                                data-user-id="{{ user.id }}"
+                                data-username="{{ user.username }}"
+                                title="Удалить">Удалить</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        <div class="empty-state-content">
+                            <h3>Пользователи не найдены</h3>
+                            <p>Попробуйте изменить параметры фильтра или убедитесь, что в системе есть зарегистрированные пользователи.</p>
+                            <a href="{% url 'users' %}" class="btn-reset">Сбросить фильтры</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальные окна -->
+<div id="modal-edit-user" class="modal"></div>
+<div id="modal-change-password" class="modal"></div>
+<div id="modal-assign-roles" class="modal"></div>
+<div id="modal-delete-confirm" class="modal"></div>
+
+<script src="{% static 'js/admin.js' %}"></script>
+{% endblock %}

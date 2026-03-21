@@ -1,0 +1,13 @@
+{% load static %}
+<div class="modal-content">
+    <h3>Удалить пользователя {{ user.username }}?</h3>
+    <p>Вы уверены, что хотите удалить пользователя {{ user.username }}? Это действие пометит пользователя как удаленного (мягкое удаление).</p>
+    <form method="post" action="{% url 'delete_user' user.id %}" class="ajax-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="form-actions">
+            <button type="submit" class="btn-delete">Удалить</button>
+            <button type="button" class="btn-cancel" onclick="closeModal('delete-confirm')">Отмена</button>
+        </div>
+    </form>
+</div>

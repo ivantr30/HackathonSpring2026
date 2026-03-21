@@ -1,0 +1,12 @@
+{% load static %}
+<div class="modal-content">
+    <h3>Назначить роли для {{ user.username }}</h3>
+    <form method="post" action="{% url 'assign_roles' user.id %}" class="ajax-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="form-actions">
+            <button type="submit" class="btn-save">Сохранить роли</button>
+            <button type="button" class="btn-cancel" onclick="closeModal('assign-roles')">Отмена</button>
+        </div>
+    </form>
+</div>
