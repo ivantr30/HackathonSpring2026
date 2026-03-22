@@ -1,7 +1,6 @@
 import re
 from .models import User, Session
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-from django import forms, AdminPasswordChangeForm
+from django.contrib.auth.forms import AdminPasswordChangeForm, UserCreationForm, AuthenticationForm
 from django import forms
 from django.contrib.auth.models import Group
 

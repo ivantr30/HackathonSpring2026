@@ -28,7 +28,7 @@
 
                 <!-- ПРОВЕРКА ДЛЯ АДМИНА -->
                 {% if request.user|has_group:"Администратор" or request.user.is_superuser %}
-                    <li><a href="/admin/" style="color: #e74c3c; font-weight: 500;">Панель Админа</a></li>
+                    <li><a href="{% url 'dashboard' %}" style="color: #e74c3c; font-weight: 500;">Панель Админа</a></li>
                 {% endif %}
 
                 <li>
