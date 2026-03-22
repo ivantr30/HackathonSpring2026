@@ -3,7 +3,7 @@ from .forms import RegistrationForm, SessionForm, CustomLoginForm
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.contrib.auth.models import Group 
+from django.contrib.auth.models import Group
 from .models import Audio, Video, MediatekElement, Playlist, Session, VoiceMessage, TextMessage, Message
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -15,27 +15,38 @@ from asgiref.sync import async_to_sync
 from django.utils import timezone
 
 import random
+
 # Create your views here.
+
 
 def user_is_host(request):
     return request.user.groups.filter(name="Ведущий").exists() or request.user.is_superuser
+
+
 def user_is_admin(request):
     return request.user.groups.filter(name="Админ").exists() or request.user.is_superuser
+
+
 @login_required
 def player_lobby(request):
     active_sessions = Session.objects.all().order_by('-id')
     return render(request, 'player_lobby.html', {'active_sessions': active_sessions})
 
+
 @login_required
 def player_room(request, session_id):
     selected_session = get_object_or_404(Session, id=session_id)
     return render(request, 'player.html', {'session': selected_session})
+
+
 @login_required
 def host(request):
     # Проверка прав доступа
     if not user_is_host(request):
         return redirect('player_lobby')
-    
+
+    # text
+
     # 1. СОЗДАНИЕ СЕССИИ (Если её еще нет)
     if not request.user.sessions.exists():
         if request.method == "POST":
@@ -61,11 +72,11 @@ def host(request):
     # ==============================================================
     # 2. СБОР ДАННЫХ ДЛЯ ПАНЕЛИ (Медиатека, Плейлист, Сообщения)
     # ==============================================================
-    
+
     # Медиатека
     my_audio = Audio.objects.filter(owner=request.user).order_by('-id')
     my_video = Video.objects.filter(owner=request.user).order_by('-id')
-    
+
     # Плейлист и Shuffle
     playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
     playlist_elements = list(playlist.elements.all()) if playlist else []
@@ -96,12 +107,15 @@ def host(request):
         "archived_msgs": archived_msgs
     })
 
+
 @login_required
 def upload_media(request):
     if request.method == "POST" and user_is_host(request):
         file = request.FILES.get('media_file')
         name = request.POST.get('name', "Без названия")
         file_type = request.POST.get('file_type')
+
+        # text
 
         if file:
             try:
@@ -121,7 +135,7 @@ def upload_media(request):
                 new_media.save()   
                 messages.success(request, f"Файл '{name}' успешно загружен!")
             except ValidationError as e:
-                 for field, error_list in e.message_dict.items():
+                for field, error_list in e.message_dict.items():
                     for error in error_list:
                         messages.error(request, f"Ошибка загрузки: {error}")
 
@@ -130,10 +144,11 @@ def upload_media(request):
 
 
 def register(request):
+    # text
 
     if request.user.is_authenticated:
         return redirect('player_lobby')
-    
+
     if request.method == "POST":
         form = RegistrationForm(request.POST)
 
@@ -144,13 +159,16 @@ def register(request):
             return redirect_if_user_wasnt_auth(request, user)
     else:
         form = RegistrationForm()
+        
     return render(request, 'register.html', {'form': form})
 
+
 def login_view(request):
+    # text
 
     if request.user.is_authenticated:
         return redirect('player_lobby')
-    
+
     if request.method == "POST":
         form = CustomLoginForm(request.POST, data=request.POST)
 
@@ -161,15 +179,20 @@ def login_view(request):
         form = CustomLoginForm()
 
     return render(request, 'login.html', {'form': form})
+
+
 def logout_view(request):
     if request.method == 'POST':
-        logout(request) 
-        return redirect('login') 
+        logout(request)
+        return redirect('login')
     return redirect("player_lobby")
 
+
 def redirect_if_user_wasnt_auth(request, user):
-    login(request, user) 
+    login(request, user)
     next_url = request.POST.get('next') or request.GET.get('next')
+
+    # text
 
     if next_url and url_has_allowed_host_and_scheme(
         url=next_url,
@@ -179,31 +202,41 @@ def redirect_if_user_wasnt_auth(request, user):
         return redirect(next_url)
     else:
         return redirect('player_lobby')
+
+
 @login_required
 def add_to_playlist(request, item_id):
     if not user_is_host(request):
         return redirect("player_lobby")
+        
     if request.method == "POST":
         item = get_object_or_404(MediatekElement, id=item_id, owner=request.user)
-        
+
+        # text
+
         playlist, created = Playlist.objects.get_or_create(owner=request.user, title="Очередь эфира")
-        
         playlist.elements.add(item)
         
     return redirect('host')
+
 
 @login_required
 def remove_from_playlist(request, item_id):
     if not user_is_host(request):
         return redirect("player_lobby")
+        
     if request.method == "POST":
         item = get_object_or_404(MediatekElement, id=item_id, owner=request.user)
         playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
-        
+
+        # text
+
         if playlist:
             playlist.elements.remove(item)
             
     return redirect('host')
+
+
 @login_required
 def toggle_shuffle(request):
     if request.method == "POST":
@@ -212,7 +245,9 @@ def toggle_shuffle(request):
             # Переключаем кнопку
             session.is_shuffled = not session.is_shuffled
             session.save()
-            
+
+            # text
+
             if session.is_shuffled:
                 # Включили Shuffle: берем треки, перемешиваем их ID и запоминаем!
                 playlist = Playlist.objects.filter(owner=request.user, title="Очередь эфира").first()
@@ -229,6 +264,8 @@ def toggle_shuffle(request):
                     del request.session['shuffled_ids']
 
     return redirect('host')
+
+
 @login_required
 def toggle_loop(request):
     if request.method == "POST":
@@ -237,11 +274,15 @@ def toggle_loop(request):
             session.is_looping = not session.is_looping
             session.save()
     return redirect('host')
+
+
 @login_required
 def delete_media(request, media_type, media_id):
     # Разрешаем удалять только через POST-запрос (для безопасности)
     if request.method == "POST":
-        
+
+        # text
+
         # Определяем, в какой таблице искать
         if media_type == 'audio':
             # Находим файл, причем ТОЛЬКО если он принадлежит текущему ведущему!
@@ -264,12 +305,16 @@ def delete_media(request, media_type, media_id):
         messages.success(request, f"Файл '{name}' успешно удален из медиатеки.")
         
     return redirect('host')
+
+
 @csrf_exempt # Отключаем CSRF, так как шлем из JS (для хакатона это безопасно)
 @login_required
 def upload_voice_message(request):
     if request.method == "POST":
         voice_file = request.FILES.get('voice_blob')
         action_type = request.POST.get('action_type') # Получаем команду: 'live' или 'playlist'
+
+        # text
 
         if voice_file:
             # 1. Сохраняем голосовое как обычный аудиофайл в медиатеку
@@ -303,13 +348,17 @@ def upload_voice_message(request):
                     )
             return JsonResponse({'status': 'ok'})
     return JsonResponse({'error': 'bad request'}, status=400)
+
+
 @login_required
 def send_message(request):
     if request.method == "POST":
         session = Session.objects.filter(is_playing=True).first()
         if not session:
             session = Session.objects.first()
-            
+
+        # text
+
         if not session:
             messages.error(request, "Нет активных ведущих.")
             return redirect(request.META.get('HTTP_REFERER', 'player_lobby'))
@@ -362,19 +411,24 @@ def send_message(request):
 
     return redirect(request.META.get('HTTP_REFERER', 'player_lobby'))
 
+
 # 2. ВЕДУЩИЙ МЕНЯЕТ СТАТУС
 @login_required
 def change_msg_status(request, msg_id):
     if request.method == "POST":
         msg = get_object_or_404(Message, id=msg_id, host=request.user)
         new_status = request.POST.get('status')
-        
+
+        # text
+
         # Если статус правильный - меняем
         if new_status in dict(Message.STATUS_CHOICES).keys():
             msg.state = new_status
             msg.save()
             
     return redirect('host')
+
+
 @login_required
 def delete_session(request):
     if request.method == "POST":
@@ -385,6 +439,8 @@ def delete_session(request):
             # Но для простоты сейчас просто удаляем сессию из БД
             session.delete()
             messages.success(request, "Эфир успешно завершен и удален.")
-            
+
+    # text
+
     # Возвращаем ведущего обратно в его панель (там появится форма создания нового эфира)
     return redirect('host')

@@ -1,471 +1,330 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Прямой эфир{% endblock %} 
+{% block title %}Прямой эфир{% endblock %}
 
 {% block extra_css %}
-<style>
-    /* ========== Player Page Styles ========== */
-    .player-container {
-        display: grid;
-        grid-template-columns: 2fr 1fr; /* Плеер шире, чат уже */
-        gap: 30px;
-        align-items: start;
-        max-width: 1200px;
-        margin: 0 auto;
-    }
+<style> /* ========== Player Page Styles ========== */ .player-container { display: grid; grid-template-columns: 2fr 1fr; /* Плеер шире, чат уже */ gap: 30px; align-items: start; max-width: 1200px; margin: 0 auto; } .panel { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); } .panel h2 { font-size: 20px; color: #333; border-bottom: 2px solid #f0f4f8; padding-bottom: 10px; margin-bottom: 20px; } /* === Media Screen (Audio/Video) === */ .media-screen { width: 100%; height: 400px; background: #111827; /* Темный экран */ border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; margin-bottom: 25px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); } .audio-visualizer { font-size: 80px; animation: pulse 2s infinite; display: block; /* По умолчанию показываем аудио-заглушку */ } .live-badge { position: absolute; top: 15px; left: 15px; background: #ff4d4d; color: white; padding: 4px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; animation: blink 2s infinite; } /* Видео скрыто по умолчанию */ #video-player { width: 100%; height: 100%; object-fit: cover; display: none; } @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } } @keyframes blink { 50% { opacity: 0.7; } } /* === Controls === */ .controls { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px 25px; border-radius: 10px; } .play-btn-wrapper { display: flex; gap: 15px; } .btn-circle { width: 60px; height: 60px; border-radius: 50%; border: none; font-size: 24px; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, filter 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); } .btn-circle:hover { transform: scale(1.05); filter: brightness(1.1); } .btn-play { background: rgb(116, 211, 255); } .btn-pause { background: #ff4d4d; } .volume-control { display: flex; align-items: center; gap: 10px; width: 200px; } .volume-control input[type="range"] { width: 100%; accent-color: rgb(116, 211, 255); } /* === Forms & Buttons === */ .form-group { margin-bottom: 15px; } textarea.form-control { width: 100%; height: 100px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; resize: none; font-family: inherit; } .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; color: white; } .btn-primary { background: rgb(116, 211, 255); } .btn-primary:hover { background: rgb(90, 190, 240); } .btn-danger { background: #ff4d4d; } .btn-danger:hover { background: #e60000; } .btn-success { background: #2ecc71; } /* Голосовое управление */ .voice-status { font-size: 13px; color: #666; text-align: center; margin-bottom: 10px; height: 18px; } .voice-controls { display: flex; gap: 10px; } .voice-controls .btn { flex: 1; } </style>
 
-    .panel {
-        background: white;
-        padding: 25px;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    }
-
-    .panel h2 {
-        font-size: 20px;
-        color: #333;
-        border-bottom: 2px solid #f0f4f8;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-    }
-
-    /* === Media Screen (Audio/Video) === */
-    .media-screen {
-        width: 100%;
-        height: 400px;
-        background: #111827; /* Темный экран */
-        border-radius: 12px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        overflow: hidden;
-        margin-bottom: 25px;
-        box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
-    }
-
-    .audio-visualizer {
-        font-size: 80px;
-        animation: pulse 2s infinite;
-        display: block; /* По умолчанию показываем аудио-заглушку */
-    }
-
-    .live-badge {
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        background: #ff4d4d;
-        color: white;
-        padding: 4px 10px;
-        border-radius: 5px;
-        font-size: 12px;
-        font-weight: bold;
-        animation: blink 2s infinite;
-    }
-
-    /* Видео скрыто по умолчанию */
-    #video-player {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: none; 
-    }
-
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.1); }
-        100% { transform: scale(1); }
-    }
-    @keyframes blink { 50% { opacity: 0.7; } }
-
-    /* === Controls === */
-    .controls {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #f8fafc;
-        padding: 15px 25px;
-        border-radius: 10px;
-    }
-
-    .play-btn-wrapper {
-        display: flex;
-        gap: 15px;
-    }
-
-    .btn-circle {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        border: none;
-        font-size: 24px;
-        color: white;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.2s, filter 0.2s;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    .btn-circle:hover { transform: scale(1.05); filter: brightness(1.1); }
-    .btn-play { background: rgb(116, 211, 255); }
-    .btn-pause { background: #ff4d4d; }
-
-    .volume-control {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        width: 200px;
-    }
-    .volume-control input[type="range"] {
-        width: 100%;
-        accent-color: rgb(116, 211, 255);
-    }
-
-    /* === Forms & Buttons === */
-    .form-group { margin-bottom: 15px; }
-    textarea.form-control {
-        width: 100%;
-        height: 100px;
-        padding: 12px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        resize: none;
-        font-family: inherit;
-    }
-    
-    .btn {
-        width: 100%;
-        padding: 12px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        color: white;
-    }
-    .btn-primary { background: rgb(116, 211, 255); }
-    .btn-primary:hover { background: rgb(90, 190, 240); }
-    .btn-danger { background: #ff4d4d; }
-    .btn-danger:hover { background: #e60000; }
-    .btn-success { background: #2ecc71; }
-
-    /* Голосовое управление */
-    .voice-status {
-        font-size: 13px;
-        color: #666;
-        text-align: center;
-        margin-bottom: 10px;
-        height: 18px;
-    }
-    .voice-controls { display: flex; gap: 10px; }
-    .voice-controls .btn { flex: 1; }
-</style>
 {% endblock %}
 
 {% block content %}
 <div class="player-container">
+
+
+<!-- ЛЕВАЯ КОЛОНКА: ПЛЕЕР -->
+<div class="panel">
+
+<!-- НОВЫЙ БЛОК: Заголовок + Кнопка возврата -->
+<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f4f8; padding-bottom: 10px; margin-bottom: 20px;">
+    <h2 style="margin: 0; border: none; padding: 0;">📻 Эфир: {{ session.title }}</h2>
     
-    <!-- ЛЕВАЯ КОЛОНКА: ПЛЕЕР -->
-    <div class="panel">
-    
-    <!-- НОВЫЙ БЛОК: Заголовок + Кнопка возврата -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f4f8; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="margin: 0; border: none; padding: 0;">📻 Эфир: {{ session.title }}</h2>
+    <!-- КНОПКА ВОЗВРАТА -->
+    <a href="{% url 'player_lobby' %}" style="
+        text-decoration: none; 
+        color: #666; 
+        background: #f0f4f8; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        font-size: 13px; 
+        font-weight: 600; 
+        transition: all 0.2s ease;">
+        ← Вернуться к списку
+    </a>
+</div>
+    <div class="media-screen">
+        <span class="live-badge">LIVE</span>
+        <div id="audio-visualizer" class="audio-visualizer">🎙️</div>
         
-        <!-- КНОПКА ВОЗВРАТА -->
-        <a href="{% url 'player_lobby' %}" style="
-            text-decoration: none; 
-            color: #666; 
-            background: #f0f4f8; 
-            padding: 6px 12px; 
-            border-radius: 6px; 
-            font-size: 13px; 
-            font-weight: 600; 
-            transition: all 0.2s ease;">
-            ← Вернуться к списку
-        </a>
+        <!-- Плеер для видеофайлов (скрыт по умолчанию) -->
+        <video id="video-player" src="" style="display: none; width: 100%; height: 100%; object-fit: cover;"></video>
     </div>
-        <div class="media-screen">
-            <span class="live-badge">LIVE</span>
-            <div id="audio-visualizer" class="audio-visualizer">🎙️</div>
-            
-            <!-- Плеер для видеофайлов (скрыт по умолчанию) -->
-            <video id="video-player" src="" style="display: none; width: 100%; height: 100%; object-fit: cover;"></video>
+    <!-- Скрытый аудиоплеер -->
+    <audio id="audio-player" src=""></audio>
+
+    <!-- ТЗ: Элементы управления -->
+    <div class="controls">
+        <div class="play-btn-wrapper">
+            <button id="btn-play" class="btn-circle btn-play" onclick="playMedia()" title="Воспроизвести">▶</button>
+            <button id="btn-pause" class="btn-circle btn-pause" onclick="pauseMedia()" style="display: none;" title="Поставить на паузу">⏸</button>
         </div>
-        <!-- Скрытый аудиоплеер -->
-        <audio id="audio-player" src=""></audio>
 
-        <!-- ТЗ: Элементы управления -->
-        <div class="controls">
-            <div class="play-btn-wrapper">
-                <button id="btn-play" class="btn-circle btn-play" onclick="playMedia()" title="Воспроизвести">▶</button>
-                <button id="btn-pause" class="btn-circle btn-pause" onclick="pauseMedia()" style="display: none;" title="Поставить на паузу">⏸</button>
-            </div>
-
-            <div class="volume-control">
-                <span>🔈</span>
-                <!-- ТЗ: Отрегулировать громкость (ползунок) -->
-                <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" oninput="changeVolume(this.value)">
-                <span>🔊</span>
-            </div>
+        <div class="volume-control">
+            <span>🔈</span>
+            <!-- ТЗ: Отрегулировать громкость (ползунок) -->
+            <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" oninput="changeVolume(this.value)">
+            <span>🔊</span>
         </div>
     </div>
-
-    <!-- ПРАВАЯ КОЛОНКА: ОБРАТНАЯ СВЯЗЬ С ВЕДУЩИМ -->
-    <div class="panel">
-        <h2>✉️ Написать в студию</h2>
-
-        <!-- ТЗ: Отправка сообщения ведущему (Текст) -->
-        <form method="POST" action="{% url 'send_message' %}" class="form-group">
-            {% csrf_token %}
-            <textarea name="text" class="form-control" placeholder="Ваше сообщение ведущему..." required></textarea>
-            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Отправить текст</button>
-        </form>
-
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
-
-        <!-- Доп. ТЗ 2: Запись голосового сообщения -->
-        <h3 style="font-size: 16px; margin-bottom: 15px; color: #333;">🎙️ Голосовое сообщение</h3>
-        <p id="voice-status" class="voice-status">Нажмите "Записать голос"</p>
-        
-        <div class="voice-controls">
-            <button id="btn-record-start" class="btn btn-danger" onclick="startRecording()">⏺ Записать</button>
-            <button id="btn-record-stop" class="btn btn-primary" onclick="stopRecording()" style="display: none;">⏹ Остановить</button>
-            <button id="btn-record-send" class="btn btn-success" onclick="sendRecording()" style="display: none;">📤 Отправить</button>
-        </div>
-    </div>
-
 </div>
 
-<!-- БАЗОВЫЕ СКРИПТЫ УПРАВЛЕНИЯ ИНТЕРФЕЙСОМ -->
+<!-- ПРАВАЯ КОЛОНКА: ОБРАТНАЯ СВЯЗЬ С ВЕДУЩИМ -->
+<div class="panel">
+    <h2>✉️ Написать в студию</h2>
+
+    <!-- ТЗ: Отправка сообщения ведущему (Текст) -->
+    <form method="POST" action="{% url 'send_message' %}" class="form-group">
+        {% csrf_token %}
+        <textarea name="text" class="form-control" placeholder="Ваше сообщение ведущему..." required></textarea>
+        <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Отправить текст</button>
+    </form>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+
+    <!-- Доп. ТЗ 2: Запись голосового сообщения -->
+    <h3 style="font-size: 16px; margin-bottom: 15px; color: #333;">🎙️ Голосовое сообщение</h3>
+    <p id="voice-status" class="voice-status">Нажмите "Записать голос"</p>
+    
+    <div class="voice-controls">
+        <button id="btn-record-start" class="btn btn-danger" onclick="startRecording()">⏺ Записать</button>
+        <button id="btn-record-stop" class="btn btn-primary" onclick="stopRecording()" style="display: none;">⏹ Остановить</button>
+        <button id="btn-record-send" class="btn btn-success" onclick="sendRecording()" style="display: none;">📤 Отправить</button>
+    </div>
+</div>
+
+</div><!-- БАЗОВЫЕ СКРИПТЫ УПРАВЛЕНИЯ ИНТЕРФЕЙСОМ -->
 <script>
-const sessionId = {{ session.id }};
-const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-const socket = new WebSocket(wsProtocol + window.location.host + "/ws/stream/" + sessionId + "/");
-
-const audioPlayer = document.getElementById('audio-player');
-const videoPlayer = document.getElementById('video-player');
-const btnPlay = document.getElementById('btn-play');
-const btnPause = document.getElementById('btn-pause');
-const audioVisualizer = document.getElementById('audio-visualizer');
-
-let hasInteracted = false;
-let isVideoMode = false;
-let currentUrl = "";
-
-document.addEventListener('click', () => {
-    hasInteracted = true;
-}, { once: true });
-
-function activePlayer() {
-    return isVideoMode ? videoPlayer : audioPlayer;
-}
-
-function showAudio() {
-    isVideoMode = false;
-    videoPlayer.pause();
-    videoPlayer.style.display = 'none';
-    audioVisualizer.style.display = 'block';
-}
-
-function showVideo() {
-    isVideoMode = true;
-    audioPlayer.pause();
-    audioVisualizer.style.display = 'none';
-    videoPlayer.style.display = 'block';
-}
-
-function setButtons(isPlaying) {
-    btnPlay.style.display = isPlaying ? 'none' : 'flex';
-    btnPause.style.display = isPlaying ? 'flex' : 'none';
-}
-
-function changeVolume(value) {
-    audioPlayer.volume = value;
-    videoPlayer.volume = value;
-}
-
-function applyState(state) {
-    if (!state.track_url) {
-        pauseMedia();
-        return;
-    }
-
-    const url = state.track_url;
-    const lower = url.toLowerCase();
-    const shouldUseVideo = lower.endsWith('.mp4') || lower.endsWith('.webm');
-    const player = shouldUseVideo ? videoPlayer : audioPlayer;
-
-    if (shouldUseVideo) {
-        showVideo();
-    } else {
-        showAudio();
-    }
-
-    const isNewTrack = currentUrl !== url;
-    currentUrl = url;
-
-    const startPlayback = () => {
-        try {
-            player.currentTime = state.position || 0;
-        } catch (e) {
-            console.log("Ошибка установки позиции:", e);
+    // Берем ID сессии прямо из шаблона Django
+    const sessionId = {{ session.id }};
+    
+    // Подставляем его в URL WebSocket!
+    const socket = new WebSocket("ws://127.0.0.1:8000/ws/stream/" + sessionId + "/");
+    
+    const audioPlayer = document.getElementById('audio-player');
+    const videoPlayer = document.getElementById('video-player');
+    const btnPlay = document.getElementById('btn-play');
+    const btnPause = document.getElementById('btn-pause');
+    const audioVisualizer = document.getElementById('audio-visualizer');
+    
+    let hasInteracted = false;
+    let pendingState = null;
+    let isVideoMode = false; // Флаг: играет видео или аудио
+    
+    function startListening() {
+        hasInteracted = true;
+        document.getElementById('join-overlay').style.display = 'none';
+        
+        // Если данные уже прилетели, но мы ждали клика - запускаем!
+        if (pendingState && pendingState.is_playing) {
+            playMedia();
         }
-
-        if (state.is_playing) {
-            if (hasInteracted) {
-                player.play().then(() => {
-                    setButtons(true);
-                }).catch(err => {
-                    console.log("Autoplay blocked:", err);
-                    setButtons(false);
-                });
-            } else {
-                setButtons(false);
+    }
+    
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        
+        // ==========================================
+        // 1. ПЕРВАЯ СИНХРОНИЗАЦИЯ ПРИ ВХОДЕ
+        // ==========================================
+        if (data.event_type === 'sync') {
+            const state = data.state;
+            
+            if (state.track_url) {
+                // Выбираем, видео это или аудио
+                if (state.track_url.endsWith('.mp4') || state.track_url.endsWith('.webm')) {
+                    switchToVideo(state.track_url);
+                    videoPlayer.currentTime = state.position; // ПЕРЕМОТКА В БУДУЩЕЕ!
+                } else {
+                    switchToAudio(state.track_url);
+                    audioPlayer.currentTime = state.position; // ПЕРЕМОТКА В БУДУЩЕЕ!
+                }
+                
+                if (state.is_playing) {
+                    if (hasInteracted) playMedia();
+                    else pendingState = state; // Запоминаем, чтобы включить после клика
+                }
             }
-        } else {
-            player.pause();
-            setButtons(false);
+        }
+        else if (data.event_type === 'change_volume') {
+            const newVolume = parseFloat(data.volume);
+            
+            // Меняем громкость аудио и видео плееров
+            audioPlayer.volume = newVolume;
+            videoPlayer.volume = newVolume;
+            
+            // Также визуально двигаем ползунок у самого слушателя (чтобы он видел изменения)
+            const volumeSlider = document.getElementById('volume-slider');
+            if (volumeSlider) {
+                volumeSlider.value = newVolume;
+            }
+        }
+        // ... твои старые условия pause, play, change_track ...
+        else if (data.event_type === 'change_track') {
+            const url = data.url.toLowerCase();
+            
+            if (url.endsWith('.mp4') || url.endsWith('.webm')) switchToVideo(data.url);
+            else switchToAudio(data.url);
+            
+            if (hasInteracted) playMedia();
+        }
+        // --- КОМАНДА: ВЕДУЩИЙ ГОВОРИТ (МИКШИРОВАНИЕ) ---
+        else if (data.event_type === 'play_host_voice') {
+            // Приглушаем фоновую музыку до 10%
+            let wasPlaying = !audioPlayer.paused;
+            let currentVolume = document.getElementById('volume-slider').value; // Запоминаем текущую громкость
+            
+            if (wasPlaying) {
+                audioPlayer.volume = currentVolume * 0.1;
+            }
+            
+            // Запускаем голос ведущего
+            const hostVoicePlayer = new Audio(data.url);
+            hostVoicePlayer.volume = currentVolume; // Голос играет на нормальной громкости
+            
+            hostVoicePlayer.play().catch(e => {
+                console.log("Браузер заблокировал автоплей голоса", e);
+            });
+            
+            // Когда ведущий договорил - возвращаем музыку на прежнюю громкость
+            hostVoicePlayer.onended = () => {
+                if (wasPlaying) {
+                    audioPlayer.volume = currentVolume;
+                }
+            };
         }
     };
-
-    if (isNewTrack) {
-        player.src = url;
-        player.onloadedmetadata = () => {
-            startPlayback();
-        };
-    } else {
-        startPlayback();
-    }
-}
-
-function playMedia() {
-    const player = activePlayer();
-    player.play().then(() => {
-        setButtons(true);
-    }).catch(err => {
-        console.log("Autoplay blocked:", err);
-    });
-}
-
-function pauseMedia() {
-    const player = activePlayer();
-    player.pause();
-    setButtons(false);
-}
-
-socket.onmessage = function(e) {
-    const data = JSON.parse(e.data);
-
-    if (data.event_type === 'sync') {
-        applyState(data.state);
-    }
-
-    else if (data.event_type === 'play_host_voice') {
-        const player = activePlayer();
-        const wasPlaying = !player.paused;
-        const currentVolume = parseFloat(document.getElementById('volume-slider').value);
-
-        if (wasPlaying) {
-            player.volume = currentVolume * 0.1;
-        }
-
-        const hostVoicePlayer = new Audio(data.url);
-        hostVoicePlayer.volume = currentVolume;
-
-        hostVoicePlayer.play().catch(err => {
-            console.log("Голос ведущего не стартовал:", err);
-        });
-
-        hostVoicePlayer.onended = () => {
-            if (wasPlaying) {
-                player.volume = currentVolume;
+    
+    // 4. Если сокет порвался (например, слушатель свернул браузер на мобилке)
+    socket.onclose = function(e) {
+        console.error("Потеряна связь с эфиром. Обновите страницу."); // Можно показать красивую плашку ошибки
+    };
+    
+    // ТЗ: Включение воспроизведения
+    function playMedia() { 
+        if (isVideoMode) { 
+            // Достаем чистый src. Если его нет — просто игнорируем нажатие
+            let src = videoPlayer.getAttribute('src');
+            if (src && src !== "") {
+                videoPlayer.play().catch(() => {}); // catch(() => {}) глушит любые ошибки браузера
+                btnPlay.style.display = 'none'; 
+                btnPause.style.display = 'flex'; 
             }
-        };
+        } else { 
+            let src = audioPlayer.getAttribute('src');
+            if (src && src !== "") {
+                audioPlayer.play().catch(() => {});
+                btnPlay.style.display = 'none'; 
+                btnPause.style.display = 'flex'; 
+            }
+        } 
     }
-};
-
-socket.onclose = function() {
-    console.error("Потеряна связь с эфиром.");
-};
-
-// ==========================================
-// ЗАПИСЬ ГОЛОСОВОГО СООБЩЕНИЯ
-// ==========================================
-let mediaRecorder;
-let audioChunks = [];
-let voiceBlob = null;
-
-const btnRecStart = document.getElementById('btn-record-start');
-const btnRecStop = document.getElementById('btn-record-stop');
-const btnRecSend = document.getElementById('btn-record-send');
-const voiceStatus = document.getElementById('voice-status');
-
-async function startRecording() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
-        mediaRecorder.onstop = () => {
-            voiceBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            voiceStatus.innerText = "Запись готова! Можно отправлять.";
-            btnRecStop.style.display = 'none';
-            btnRecSend.style.display = 'block';
-            stream.getTracks().forEach(track => track.stop());
-        };
-
-        mediaRecorder.start();
-        voiceStatus.innerText = "🔴 Идет запись...";
-        voiceStatus.style.color = "#ff4d4d";
-        btnRecStart.style.display = 'none';
-        btnRecStop.style.display = 'block';
-    } catch (err) {
-        alert("Ошибка доступа к микрофону. Проверьте разрешения браузера.");
-    }
-}
-
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-        voiceStatus.style.color = "#333";
-    }
-}
-
-function sendRecording() {
-    if (!voiceBlob) return;
-
-    voiceStatus.innerText = "⏳ Отправка...";
-
-    const formData = new FormData();
-    formData.append('voice_message', voiceBlob, 'message.webm');
-
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-    fetch('{% url "send_message" %}', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': csrfToken
-        }
-    }).then(response => {
-        if (response.ok) {
-            voiceStatus.innerText = "✅ Успешно отправлено!";
-            voiceStatus.style.color = "#2ecc71";
-            btnRecSend.style.display = 'none';
-            btnRecStart.style.display = 'block';
-            voiceBlob = null;
-            setTimeout(() => location.reload(), 1000);
+    // ТЗ: Пауза
+    function pauseMedia() {
+        if (isVideoMode) {
+            videoPlayer.pause();
         } else {
-            alert("Ошибка отправки.");
+            audioPlayer.pause();
         }
-    });
-}
+        btnPause.style.display = 'none';
+        btnPlay.style.display = 'flex';
+    }
+    
+    // ТЗ: Ползунок громкости
+    function changeVolume(value) {
+        audioPlayer.volume = value;
+        videoPlayer.volume = value;
+    }
+    
+    // Доп. ТЗ 1: Автоматическое переключение на видео (Вызовешь эту функцию из сокетов)
+    function switchToVideo(videoUrl) {
+        isVideoMode = true;
+        audioPlayer.pause();
+        audioVisualizer.style.display = 'none';
+        videoPlayer.style.display = 'block';
+        videoPlayer.src = videoUrl;
+        playMedia();
+    }
+    
+    function switchToAudio(audioUrl) {
+        isVideoMode = false;
+        videoPlayer.pause();
+        videoPlayer.style.display = 'none';
+        audioVisualizer.style.display = 'block';
+        audioPlayer.src = audioUrl;
+        playMedia();
+    }
+    
+    // ==========================================
+    // Доп. ТЗ 2: ЗАПИСЬ ГОЛОСОВОГО СООБЩЕНИЯ
+    // ==========================================
+    let mediaRecorder;
+    let audioChunks = [];
+    let voiceBlob = null;
+    
+    const btnRecStart = document.getElementById('btn-record-start');
+    const btnRecStop = document.getElementById('btn-record-stop');
+    const btnRecSend = document.getElementById('btn-record-send');
+    const voiceStatus = document.getElementById('voice-status');
+    
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            
+            mediaRecorder.onstop = () => {
+                voiceBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                voiceStatus.innerText = "Запись готова! Можно отправлять.";
+                btnRecStop.style.display = 'none';
+                btnRecSend.style.display = 'block';
+                
+                // Отключаем микрофон
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            mediaRecorder.start();
+            voiceStatus.innerText = "🔴 Идет запись...";
+            voiceStatus.style.color = "#ff4d4d";
+            btnRecStart.style.display = 'none';
+            btnRecStop.style.display = 'block';
+        } catch (err) {
+            alert("Ошибка доступа к микрофону. Проверьте разрешения браузера.");
+        }
+    }
+    
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            voiceStatus.style.color = "#333";
+        }
+    }
+    
+    function sendRecording() {
+        if (!voiceBlob) return;
+        
+        voiceStatus.innerText = "⏳ Отправка...";
+        
+        // Формируем файл
+        const formData = new FormData();
+        formData.append('voice_message', voiceBlob, 'message.mp3');
+        
+        // Чтобы Django принял POST через JS, нам нужен CSRF-токен
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Отправляем
+        fetch('{% url "send_message" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                voiceStatus.innerText = "✅ Успешно отправлено!";
+                voiceStatus.style.color = "#2ecc71";
+                btnRecSend.style.display = 'none';
+                btnRecStart.style.display = 'block';
+                voiceBlob = null;
+                
+                // Перезагрузим страницу, чтобы вылез зеленый Alert Django "Сообщение отправлено"
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                alert("Ошибка отправки.");
+            }
+        });
+    }
 </script>
 {% endblock %}

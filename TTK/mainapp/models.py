@@ -1,74 +1,85 @@
 from django.db import models
 from django.core.validators import FileExtensionValidator, RegexValidator
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser 
+from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+#Create your models here.
+#Роли реализованны через django groups, пример в admin.py
+#2 ВАЛИДАТОРА НИЖЕ РАБОТАЮТ ТОЛЬКО ПРИ ВЫЗОВЕ full-clean() при сохранении формы!!!!
 
-# Create your models here.
-# Роли реализованны через django groups, пример в admin.py
-# 2 ВАЛИДАТОРА НИЖЕ РАБОТАЮТ ТОЛЬКО ПРИ ВЫЗОВЕ full-clean() при сохранении формы!!!!
 def validate_video_size(value):
     limit_mb = 1000
     if value.size > limit_mb * 1024 * 1024:
         raise ValidationError(f'Файл слишком большой! Максимум {limit_mb} МБ.')
-    
+
 def validate_audio_size(value):
     limit_mb = 50
     if value.size > limit_mb * 1024 * 1024:
         raise ValidationError(f'Файл слишком большой! Максимум {limit_mb} МБ.')
-     
+
 class User(AbstractUser):
     username = models.CharField(
-        max_length=35, 
-        unique=True, 
+        max_length=35,
+        unique=True,
         validators=[
             RegexValidator(
-                regex=r'^[a-zA-Z]+$', 
+                regex=r"^[a-zA-Z]+$",
             )
-        ]
+        ],
     )
-    fullName = models.CharField(max_length=100, verbose_name="ФИО", validators=[RegexValidator(regex=r'^[А-Яа-яЁё\s-]+$',)])
+    fullName = models.CharField(
+        max_length=100,
+        verbose_name="ФИО",
+        validators=[
+            RegexValidator(
+                regex=r"^[А-Яа-яЁё\s-]+$",
+            )
+        ],
+    )
+    is_deleted = models.BooleanField(default=False, verbose_name="Удален")
+
     def __str__(self):
         return self.username[:20]
-
 
 class Message(models.Model):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='messages')
     host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='receivedmessages')
     STATUS_CHOICES = [
-        ('new', 'Новое'),
-        ('in_progress', 'В работе'),
-        ('done', 'Завершено'),
+    ('new', 'Новое'),
+    ('in_progress', 'В работе'),
+    ('done', 'Завершено'),
     ]
     state = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
     creation_time = models.DateTimeField()
-    def __str__(self):
-        return self.sender.__str__()
-    
+    def str(self):
+        return self.sender.str()
+
 class VoiceMessage(Message):
     voice_message = models.FileField(
-        upload_to='voice/', 
-        validators=[FileExtensionValidator(allowed_extensions=['mp3', 'wav', 'ogg'])],
+    upload_to='voice/',
+    validators=[FileExtensionValidator(allowed_extensions=['mp3', 'wav', 'ogg'])],
     )
-    def __str__(self):
-        return super().__str__()
-    
+    def str(self):
+        return super().str()
+
 class TextMessage(Message):
     text = models.TextField()
-    def __str__(self):
-        return super().__str__()
-    
+    def str(self):
+        return super().str()
+
 class MediatekElement(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mediatekelements')
     name = models.CharField(max_length=100)
     def url(self):
-        if hasattr(self, 'audio') and self.audio.audio_file:
+        try:
             return self.audio.audio_file.url
-        if hasattr(self, 'video') and self.video.video_file:
-            return self.video.video_file.url
-        return ""
-    
+        except:
+            try:
+                return self.video.video_file.url
+            except:
+                return ""
+
 class Session(models.Model):
     title = models.CharField(max_length=50)
     elements = models.ManyToManyField(Message, related_name='sessions', blank=True, null=True)
@@ -79,7 +90,7 @@ class Session(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sessions')
     is_looping = models.BooleanField(default=False)
     is_shuffled = models.BooleanField(default=False)
-    master_volume = models.FloatField(default=1.0)
+
 
     def get_state(self):
         if not self.current_track:
@@ -97,22 +108,21 @@ class Session(models.Model):
             "server_time" : timezone.now().isoformat()
         }
 
-    def __str__(self):
-        return self.title[:20]
-
+def __str__(self):
+    return self.title[:20]
 
 class Playlist(models.Model):
     title = models.CharField(max_length=100)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='playlists')
     elements = models.ManyToManyField(MediatekElement, related_name='playlists', blank=True)
-    
+
 class Audio(MediatekElement):
     audio_file = models.FileField(
-        upload_to='audio/', 
-        validators=[FileExtensionValidator(allowed_extensions=['mp3', 'wav', 'ogg']), validate_audio_size],
+    upload_to='audio/',
+    validators=[FileExtensionValidator(allowed_extensions=['mp3', 'wav', 'ogg']), validate_audio_size],
     )
 class Video(MediatekElement):
     video_file = models.FileField(
-        upload_to='video/', 
-        validators=[FileExtensionValidator(allowed_extensions=['mp4', 'webm']), validate_video_size],
+    upload_to='video/',
+    validators=[FileExtensionValidator(allowed_extensions=['mp4', 'webm']), validate_video_size],
     )

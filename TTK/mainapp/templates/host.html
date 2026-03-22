@@ -4,515 +4,487 @@
 {% block title %}Панель ведущего{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static '/css/host.css' %}">
-{% endblock %}
+<link rel="stylesheet" href="{% static '/css/host.css' %}"> {% endblock %}
 
 {% block content %}
-<!-- ШАПКА: ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ ЭФИРА -->
-<div class="dashboard-header">
-    <div>
-        <h1 style="margin-bottom: 5px;">🎛️ Панель управления эфиром</h1>
-        <p style="color: #666; font-size: 14px;">Режимы: Аудио, Видео, Интерактив</p>
-    </div>
+<!-- ШАПКА: ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ ЭФИРА --><div class="dashboard-header"> <div> <h1 style="margin-bottom: 5px;">🎛️ Панель управления эфиром</h1> <p style="color: #666; font-size: 14px;">Режимы: Аудио, Видео, Интерактив</p> </div>
 
-    <div class="session-controls">
-        {% if not has_session %}
-            <form method="post" class="create-session-form">
-                {% csrf_token%}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-primary">Создать эфир</button>
-            </form>
-        {% endif %}
+<div class="session-controls">
+    {% if not has_session %}
+        <form method="post" class="create-session-form">
+            {% csrf_token%}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary">Создать эфир</button>
+        </form>
+    {% endif %}
+    
+    <!-- Кнопки появятся ТОЛЬКО если есть сессия -->
+    {% if has_session %}
         
-        <!-- Кнопки появятся ТОЛЬКО если есть сессия -->
-        {% if has_session %}
-            
-            <!-- Кнопка старта/паузы -->
-            <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}" style="font-size: 16px; padding: 12px 20px;">
-                {% if not is_playing %}▶ Начать эфир{% else %}⏸ Приостановить эфир{% endif %}
-            </button>
+        <!-- Кнопка старта/паузы -->
+        <button onclick="toggleStream()" id="streamToggler" class="btn {% if not is_playing %}btn-success{% else %}btn-danger{% endif %}" style="font-size: 16px; padding: 12px 20px;">
+            {% if not is_playing %}▶ Начать эфир{% else %}⏸ Приостановить эфир{% endif %}
+        </button>
 
-            <!-- НОВАЯ КНОПКА: ЗАВЕРШИТЬ (УДАЛИТЬ) ЭФИР -->
-            <form action="{% url 'delete_session' %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите навсегда завершить и удалить этот эфир?');">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-secondary" style="font-size: 14px; padding: 12px 15px; background: #e74c3c; color: white;" title="Удалить текущую сессию">
-                    ⏹ Завершить эфир
-                </button>
-            </form>
-            
-        {% endif %}
-    </div>
+        <!-- НОВАЯ КНОПКА: ЗАВЕРШИТЬ (УДАЛИТЬ) ЭФИР -->
+        <form action="{% url 'delete_session' %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите навсегда завершить и удалить этот эфир?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary" style="font-size: 14px; padding: 12px 15px; background: #e74c3c; color: white;" title="Удалить текущую сессию">
+                ⏹ Завершить эфир
+            </button>
+        </form>
+        
+    {% endif %}
 </div>
 
-<div class="dashboard-grid">
+</div><div class="dashboard-grid">
 
-    <!-- КОЛОНКА 1: МЕДИАТЕКА И ПЛЕЙЛИСТ (По ТЗ) -->
-    <div class="panel">
-        <h2>📁 Работа с медиа</h2>
-        
-        <!-- Загрузка с ПК (с указанием ограничений из ТЗ) -->
-        <form action="{% url 'upload_media' %}" method="POST" enctype="multipart/form-data" class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+
+<!-- КОЛОНКА 1: МЕДИАТЕКА И ПЛЕЙЛИСТ (По ТЗ) -->
+<div class="panel">
+    <h2>📁 Работа с медиа</h2>
+    
+    <!-- Загрузка с ПК (с указанием ограничений из ТЗ) -->
+    <form action="{% url 'upload_media' %}" method="POST" enctype="multipart/form-data" class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+        {% csrf_token %}
+        <h3 style="margin-top:0;">📤 Загрузить файл с ПК</h3>
+        <input type="text" name="name" class="form-control" placeholder="Название файла" required>
+        <select name="file_type" class="form-control">
+            <option value="audio">Аудио (MP3, WAV, OGG) — до 50 Мб</option>
+            <option value="video">Видео (MP4, WebM) — до 1000 Мб</option>
+        </select>
+        <input type="file" name="media_file" class="form-control" required>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Загрузить в медиатеку</button>
+    </form>
+
+    <!-- Плейлист (Очередь воспроизведения) -->
+    <h3>📻 Текущий плейлист (Очередь)</h3>
+    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <form action="{% url 'toggle_shuffle' %}" method="POST" style="flex: 1; margin: 0;">
             {% csrf_token %}
-            <h3 style="margin-top:0;">📤 Загрузить файл с ПК</h3>
-            <input type="text" name="name" class="form-control" placeholder="Название файла" required>
-            <select name="file_type" class="form-control">
-                <option value="audio">Аудио (MP3, WAV, OGG) — до 50 Мб</option>
-                <option value="video">Видео (MP4, WebM) — до 1000 Мб</option>
-            </select>
-            <input type="file" name="media_file" class="form-control" required>
-            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Загрузить в медиатеку</button>
+            <button type="submit" class="btn {% if session.is_shuffled %}btn-primary{% else %}btn-secondary{% endif %}" style="width: 100%; font-size: 12px;">🔀 Перемешать</button>
         </form>
 
-        <!-- Плейлист (Очередь воспроизведения) -->
-        <h3>📻 Текущий плейлист (Очередь)</h3>
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <form action="{% url 'toggle_shuffle' %}" method="POST" style="flex: 1; margin: 0;">
-                {% csrf_token %}
-                <button type="submit" class="btn {% if session.is_shuffled %}btn-primary{% else %}btn-secondary{% endif %}" style="width: 100%; font-size: 12px;">🔀 Перемешать</button>
-            </form>
-
-            <form action="{% url 'toggle_loop' %}" method="POST" style="flex: 1; margin: 0;">
-                {% csrf_token %}
-                <button type="submit" class="btn {% if session.is_looping %}btn-primary{% else %}btn-secondary{% endif %}" style="width: 100%; font-size: 12px;">🔁 Зациклить</button>
-            </form>
-        </div>
+        <form action="{% url 'toggle_loop' %}" method="POST" style="flex: 1; margin: 0;">
+            {% csrf_token %}
+            <button type="submit" class="btn {% if session.is_looping %}btn-primary{% else %}btn-secondary{% endif %}" style="width: 100%; font-size: 12px;">🔁 Зациклить</button>
+        </form>
+    </div>
+    
+    <div class="media-list" style="background: #f0fff4;">
         
-        <div class="media-list" style="background: #f0fff4;">
-            
-            {% for item in playlist_elements %}
-            <div class="media-item playlist-item">
-                <span>{{ forloop.counter }}. {{ item.name }}</span>
-                <div style="display: flex; gap: 5px;">
-
-                    <button
-                        class="btn btn-success btn-small play-track-btn"
-                        data-track-id="{{ item.id }}"
-                        data-track-url="{{ item.url }}"
-                        onclick="playTrack({{ item.id }}, '{{ item.url }}')">
-                        ▶ Играть
-                    </button>
-                    
-                    <form action="{% url 'remove_from_playlist' item.id %}" method="POST" style="margin: 0;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-small">✕</button>
-                    </form>
-                </div>
-            </div>
-            {% empty %}
-                <p style="text-align: center; color: gray; font-size: 14px; margin-top: 10px;">Очередь пуста</p>
-            {% endfor %}
-            
-        </div>
-
-        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
-
-               <!-- Личная медиатека (Хранилище) -->
-        <h3>📚 Ваша медиатека</h3>
-        <div class="media-list">
-            
-            <!-- ЦИКЛ: АУДИО -->
-            {% for audio in my_audio %}
-            <div class="media-item">
-                <span>🎵 {{ audio.name }}</span>
-                <div style="display: flex; gap: 5px;">
-                    <!-- КНОПКА ДОБАВЛЕНИЯ В ОЧЕРЕДЬ -->
-                    <form action="{% url 'add_to_playlist' audio.id %}" method="POST" style="margin: 0;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary btn-small" title="Добавить в плейлист">+</button>
-                    </form>
-
-                    <!-- НОВАЯ КНОПКА: УДАЛЕНИЕ ИЗ МЕДИАТЕКИ С ПОДТВЕРЖДЕНИЕМ -->
-                    <!-- onsubmit="return confirm(...)" остановит отправку формы, если юзер нажмет "Отмена" -->
-                    <form action="{% url 'delete_media' 'audio' audio.id %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите удалить трек {{ audio.name|escapejs }} навсегда?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-small" title="Удалить файл">🗑️</button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
-
-            <!-- ЦИКЛ: ВИДЕО -->
-            {% for video in my_video %}
-            <div class="media-item">
-                <span>🎬 {{ video.name }}</span>
-                <div style="display: flex; gap: 5px;">
-                    <!-- КНОПКА ДОБАВЛЕНИЯ В ОЧЕРЕДЬ -->
-                    <form action="{% url 'add_to_playlist' video.id %}" method="POST" style="margin: 0;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary btn-small" title="Добавить в плейлист">+</button>
-                    </form>
-
-                    <!-- НОВАЯ КНОПКА: УДАЛЕНИЕ ИЗ МЕДИАТЕКИ С ПОДТВЕРЖДЕНИЕМ -->
-                    <form action="{% url 'delete_media' 'video' video.id %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите удалить видео {{ video.name|escapejs }} навсегда?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-small" title="Удалить файл">🗑️</button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
-            
-            {% if not my_audio and not my_video %}
-                <p style="text-align: center; color: gray; font-size: 14px; margin-top: 10px;">Медиатека пуста</p>
-            {% endif %}
-        </div>
-
-    </div>
-
-    <!-- КОЛОНКА 2: ПРЯМЫЕ ВКЛЮЧЕНИЯ И НАСТРОЙКИ (По ТЗ) -->
-    <div class="panel">
-        <h2>🎙️ Прямой эфир (Live)</h2>
-
-        <!-- Управление громкостью -->
-        <h3>🔊 Общая громкость эфира (Master)</h3>
-        <div class="volume-control">
-            <span>🔈</span>
-            <input type="range" id="master-volume-slider" min="0" max="100" value="100">
-            <span>🔊</span>
-        </div>
-
-        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
-
-        <!-- Работа с микрофоном -->
-         <h3>🎙️ Микрофон (Аудиосообщение)</h3>
-        <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Запишите голос, чтобы добавить его в плейлист или сразу запустить слушателям.</p>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-            <button id="btn-rec-start" class="btn btn-danger">⏺ Начать запись</button>
-            
-            <!-- Этот блок покажем только после окончания записи -->
-            <div id="mic-actions" style="display: none; gap: 10px;">
-                <button id="btn-send-playlist" class="btn btn-primary" style="flex:1;">В плейлист</button>
-                <button id="btn-send-live" class="btn btn-success" style="flex:1;">▶ Сразу в эфир</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- КОЛОНКА 3: УПРАВЛЕНИЕ СООБЩЕНИЯМИ (По ТЗ) -->
-    <div class="panel">
-        <h2>📨 Сообщения пользователей</h2>
-
-        <!-- Активные (Новый, В работе) -->
-        <h3>Новые и в работе:</h3>
-        <div id="active-messages-list" class="media-list" style="max-height: 350px; background: white; border: none; padding: 0;">
-            
-            {% for msg in active_msgs %}
-            <div class="msg-card {% if msg.state == 'in_progress' %}in-progress{% endif %}">
-                <div class="msg-header">
-                    <strong>{{ msg.sender.username }}</strong>
-                    <span style="color: {% if msg.state == 'new' %}#ff0000{% else %}#f1c40f{% endif %}; font-weight: bold;">
-                        {{ msg.get_state_display }}
-                    </span>
-                </div>
+        {% for item in playlist_elements %}
+        <div class="media-item playlist-item">
+            <span>{{ forloop.counter }}. {{ item.name }}</span>
+            <div style="display: flex; gap: 5px;">
+                <button class="btn btn-success btn-small" onclick="playTrack({{ item.id }}, '{% if item.audio %}{{ item.audio.audio_file.url }}{% elif item.video %}{{ item.video.video_file.url }}{% endif %}')">▶ Играть</button>
                 
-                <!-- Проверяем, текст это или голосовое (мы писали это ранее в моделях) -->
-                {% if msg.textmessage.id %}
-                    <p style="font-size: 14px; margin-bottom: 5px;">{{ msg.textmessage.text }}</p>
-                {% elif msg.voicemessage.id %}
-                    <audio controls src="{{ msg.voicemessage.voice_message.url }}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>
-                {% endif %}
-
-                <!-- КНОПКИ СМЕНЫ СТАТУСА -->
-                <div class="msg-actions">
-                    <!-- Кнопка "В работу" показывается только для Новых -->
-                    {% if msg.state == 'new' %}
-                    <form action="{% url 'change_msg_status' msg.id %}" method="POST" style="margin:0;">
-                        {% csrf_token %}
-                        <input type="hidden" name="status" value="in_progress">
-                        <button type="submit" class="btn btn-secondary btn-small">В работу</button>
-                    </form>
-                    {% endif %}
-                    
-                    <form action="{% url 'change_msg_status' msg.id %}" method="POST" style="margin:0;">
-                        {% csrf_token %}
-                        <input type="hidden" name="status" value="done">
-                        <button type="submit" class="btn btn-success btn-small">Завершить</button>
-                    </form>
-                </div>
+                <form action="{% url 'remove_from_playlist' item.id %}" method="POST" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-small">✕</button>
+                </form>
             </div>
-            {% empty %}
-                <p style="color: gray; font-size: 13px;">Новых сообщений нет.</p>
-            {% endfor %}
         </div>
+        {% empty %}
+            <p style="text-align: center; color: gray; font-size: 14px; margin-top: 10px;">Очередь пуста</p>
+        {% endfor %}
+        
+    </div>
 
-        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
+    <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
 
-        <!-- Архив (Завершено) -->
-        <h3>🗄️ Архив (Завершенные):</h3>
-        <div class="media-list" style="max-height: 200px; background: white; border: none; padding: 0;">
-            {% for msg in archived_msgs %}
-            <div class="msg-card done">
-                <div class="msg-header">
-                    <strong>{{ msg.sender.username }}</strong>
-                    <span>Завершено</span>
-                </div>
-                <p style="font-size: 14px; margin: 0;">
-                    {% if msg.textmessage.id %} {{ msg.textmessage.text|truncatechars:30 }} 
-                    {% else %} 🎙️ Голосовое сообщение {% endif %}
-                </p>
+           <!-- Личная медиатека (Хранилище) -->
+    <h3>📚 Ваша медиатека</h3>
+    <div class="media-list">
+        
+        <!-- ЦИКЛ: АУДИО -->
+        {% for audio in my_audio %}
+        <div class="media-item">
+            <span>🎵 {{ audio.name }}</span>
+            <div style="display: flex; gap: 5px;">
+                <!-- КНОПКА ДОБАВЛЕНИЯ В ОЧЕРЕДЬ -->
+                <form action="{% url 'add_to_playlist' audio.id %}" method="POST" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-small" title="Добавить в плейлист">+</button>
+                </form>
+
+                <!-- НОВАЯ КНОПКА: УДАЛЕНИЕ ИЗ МЕДИАТЕКИ С ПОДТВЕРЖДЕНИЕМ -->
+                <!-- onsubmit="return confirm(...)" остановит отправку формы, если юзер нажмет "Отмена" -->
+                <form action="{% url 'delete_media' 'audio' audio.id %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите удалить трек {{ audio.name|escapejs }} навсегда?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-small" title="Удалить файл">🗑️</button>
+                </form>
             </div>
-            {% empty %}
-                <p style="color: gray; font-size: 13px;">Архив пуст.</p>
-            {% endfor %}
         </div>
+        {% endfor %}
+
+        <!-- ЦИКЛ: ВИДЕО -->
+        {% for video in my_video %}
+        <div class="media-item">
+            <span>🎬 {{ video.name }}</span>
+            <div style="display: flex; gap: 5px;">
+                <!-- КНОПКА ДОБАВЛЕНИЯ В ОЧЕРЕДЬ -->
+                <form action="{% url 'add_to_playlist' video.id %}" method="POST" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-small" title="Добавить в плейлист">+</button>
+                </form>
+
+                <!-- НОВАЯ КНОПКА: УДАЛЕНИЕ ИЗ МЕДИАТЕКИ С ПОДТВЕРЖДЕНИЕМ -->
+                <form action="{% url 'delete_media' 'video' video.id %}" method="POST" style="margin: 0;" onsubmit="return confirm('Вы точно хотите удалить видео {{ video.name|escapejs }} навсегда?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-small" title="Удалить файл">🗑️</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not my_audio and not my_video %}
+            <p style="text-align: center; color: gray; font-size: 14px; margin-top: 10px;">Медиатека пуста</p>
+        {% endif %}
     </div>
 
 </div>
 
-<!-- ФЛАГ СОСТОЯНИЯ ЭФИРА ИЗ DJANGO -->
-<!-- =================================================== -->
-<!-- СКРИПТЫ, КОТОРЫЕ ЗАВИСЯТ ОТ СОЗДАННОЙ СЕССИИ        -->
-<!-- =================================================== -->
+<!-- КОЛОНКА 2: ПРЯМЫЕ ВКЛЮЧЕНИЯ И НАСТРОЙКИ (По ТЗ) -->
+<div class="panel">
+    <h2>🎙️ Прямой эфир (Live)</h2>
+
+    <!-- Управление громкостью -->
+    <h3>🔊 Общая громкость эфира (Master)</h3>
+    <div class="volume-control">
+        <span>🔈</span>
+        <!-- Добавили id и oninput -->
+        <input type="range" id="master-volume" min="0" max="100" value="100" oninput="changeMasterVolume(this.value)">
+        <span>🔊</span>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #e2e8f0; margin: 20px 0;">
+
+    <!-- Работа с микрофоном -->
+     <h3>🎙️ Микрофон (Аудиосообщение)</h3>
+    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Запишите голос, чтобы добавить его в плейлист или сразу запустить слушателям.</p>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button id="btn-rec-start" class="btn btn-danger">⏺ Начать запись</button>
+        
+        <!-- Этот блок покажем только после окончания записи -->
+        <div id="mic-actions" style="display: none; gap: 10px;">
+            <button id="btn-send-playlist" class="btn btn-primary" style="flex:1;">В плейлист</button>
+            <button id="btn-send-live" class="btn btn-success" style="flex:1;">▶ Сразу в эфир</button>
+        </div>
+    </div>
+</div>
+
+<!-- КОЛОНКА 3: УПРАВЛЕНИЕ СООБЩЕНИЯМИ (По ТЗ) -->
+<div class="panel">
+    <h2>📨 Сообщения пользователей</h2>
+
+    <!-- Активные (Новый, В работе) -->
+    <h3>Новые и в работе:</h3>
+    <div id="active-messages-list" class="media-list" style="max-height: 350px; background: white; border: none; padding: 0;">
+        
+        {% for msg in active_msgs %}
+        <div class="msg-card {% if msg.state == 'in_progress' %}in-progress{% endif %}">
+            <div class="msg-header">
+                <strong>{{ msg.sender.username }}</strong>
+                <span style="color: {% if msg.state == 'new' %}#ff0000{% else %}#f1c40f{% endif %}; font-weight: bold;">
+                    {{ msg.get_state_display }}
+                </span>
+            </div>
+            
+            <!-- Проверяем, текст это или голосовое (мы писали это ранее в моделях) -->
+            {% if msg.textmessage.id %}
+                <p style="font-size: 14px; margin-bottom: 5px;">{{ msg.textmessage.text }}</p>
+            {% elif msg.voicemessage.id %}
+                <audio controls src="{{ msg.voicemessage.voice_message.url }}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>
+            {% endif %}
+
+            <!-- КНОПКИ СМЕНЫ СТАТУСА -->
+            <div class="msg-actions">
+                <!-- Кнопка "В работу" показывается только для Новых -->
+                {% if msg.state == 'new' %}
+                <form action="{% url 'change_msg_status' msg.id %}" method="POST" style="margin:0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="in_progress">
+                    <button type="submit" class="btn btn-secondary btn-small">В работу</button>
+                </form>
+                {% endif %}
+                
+                <form action="{% url 'change_msg_status' msg.id %}" method="POST" style="margin:0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="done">
+                    <button type="submit" class="btn btn-success btn-small">Завершить</button>
+                </form>
+            </div>
+        </div>
+        {% empty %}
+            <p style="color: gray; font-size: 13px;">Новых сообщений нет.</p>
+        {% endfor %}
+    </div>
+
+    <hr style="border:0; border-top:1px solid #e2e8f0; margin: 15px 0;">
+
+    <!-- Архив (Завершено) -->
+    <h3>🗄️ Архив (Завершенные):</h3>
+    <div class="media-list" style="max-height: 200px; background: white; border: none; padding: 0;">
+        {% for msg in archived_msgs %}
+        <div class="msg-card done">
+            <div class="msg-header">
+                <strong>{{ msg.sender.username }}</strong>
+                <span>Завершено</span>
+            </div>
+            <p style="font-size: 14px; margin: 0;">
+                {% if msg.textmessage.id %} {{ msg.textmessage.text|truncatechars:30 }} 
+                {% else %} 🎙️ Голосовое сообщение {% endif %}
+            </p>
+        </div>
+        {% empty %}
+            <p style="color: gray; font-size: 13px;">Архив пуст.</p>
+        {% endfor %}
+    </div>
+</div>
+
+</div><!-- ФЛАГ СОСТОЯНИЯ ЭФИРА ИЗ DJANGO --><!-- =================================================== --><!-- СКРИПТЫ, КОТОРЫЕ ЗАВИСЯТ ОТ СОЗДАННОЙ СЕССИИ --><!-- =================================================== -->
+
 {% if has_session %}
 <!-- Передаем флаг состояния из Django в JS -->
+
 {{ is_playing|json_script:"is_playing-flag" }}
-
-{% endif %}
 <script>
-const sessionId = "{{ session.id }}";
-const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-const socket = new WebSocket(wsProtocol + window.location.host + "/ws/stream/" + sessionId + "/");
+    // 1. ПОДКЛЮЧЕНИЕ К WEBSOCKET
+    const sessionId = {{ session.id }};
+    const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const socket = new WebSocket(wsProtocol + window.location.host + "/ws/stream/" + sessionId + "/");
+    let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
 
-let isPlaying = JSON.parse(document.getElementById("is_playing-flag").textContent);
-const isLooping = {{ session.is_looping|yesno:"true,false" }};
+    // 2. ЛОГИКА ПЛЕЙЛИСТА И МЕТРОНОМА
+    const isLooping = {{ session.is_looping|yesno:"true,false" }};
+    let currentTrackUrl = "";
+    
+    const hostGhostPlayer = new Audio();
+    hostGhostPlayer.muted = true; // Ведущий не слышит звук
+    
+    hostGhostPlayer.onended = function() {
+        playNextTrack();
+    };
 
-let currentTrackId = null;
-let currentTrackUrl = "";
-
-const hostGhostPlayer = new Audio();
-hostGhostPlayer.muted = true;
-
-// ==========================================
-// Работа с плейлистом
-// ==========================================
-function getPlaylistTracks() {
-    const buttons = document.querySelectorAll('.play-track-btn');
-    const tracks = [];
-
-    buttons.forEach(btn => {
-        tracks.push({
-            id: parseInt(btn.dataset.trackId),
-            url: btn.dataset.trackUrl
+    function getPlaylistUrls() {
+        const buttons = document.querySelectorAll('.media-list .btn-success.btn-small');
+        let urls = [];
+        buttons.forEach(btn => {
+            const match = btn.getAttribute('onclick').match(/'([^']+)'/);
+            if (match) urls.push(match[1]);
         });
-    });
-
-    return tracks;
-}
-
-function playTrack(trackId, fileUrl) {
-    currentTrackId = trackId;
-    currentTrackUrl = fileUrl;
-
-    socket.send(JSON.stringify({
-        action: 'change_track',
-        track_id: trackId,
-        url: fileUrl
-    }));
-
-    hostGhostPlayer.src = fileUrl;
-    hostGhostPlayer.load();
-
-    if (!isPlaying) {
-        toggleStream();
-    } else {
-        hostGhostPlayer.play().catch(err => {
-            console.log("Ghost player play error:", err);
-        });
-    }
-}
-
-function playNextTrack() {
-    const tracks = getPlaylistTracks();
-    if (tracks.length === 0) return;
-
-    let currentIndex = tracks.findIndex(track => track.id === currentTrackId);
-
-    // если текущий не найден, стартуем с первого
-    if (currentIndex === -1) {
-        playTrack(tracks[0].id, tracks[0].url);
-        return;
+        return urls;
     }
 
-    let nextIndex = currentIndex + 1;
+    function playTrack(trackId, fileUrl) {
+        currentTrackUrl = fileUrl;
+        socket.send(JSON.stringify({
+            'action': 'change_track',
+            'track_id': trackId, // Шлем ID на сервер
+            'url': fileUrl
+        }));
+        
+        hostGhostPlayer.src = fileUrl;
+        hostGhostPlayer.play();
+        
+        if (!isPlaying) {
+            toggleStream();
+        }
+    }
 
-    if (nextIndex >= tracks.length) {
-        if (isLooping) {
-            nextIndex = 0;
+    function playNextTrack() {
+        const urls = getPlaylistUrls();
+        if (urls.length === 0) return;
+        
+        let currentIndex = urls.indexOf(currentTrackUrl);
+        let nextIndex = currentIndex + 1;
+        
+        if (nextIndex >= urls.length) {
+            if (isLooping) {
+                nextIndex = 0;
+            } else {
+                return;
+            }
+        }
+        playTrack(urls[nextIndex]);
+    }
+
+    // 3. УПРАВЛЕНИЕ ЭФИРОМ (Пауза/Плей)
+    function toggleStream() {
+        const streamtoggler = document.getElementById("streamToggler");
+        isPlaying = !isPlaying;
+        let action = "";
+        
+        if (isPlaying) {
+            streamtoggler.innerText = "⏸ Приостановить эфир";
+            streamtoggler.classList.replace('btn-success', 'btn-danger');
+            action = "play";
+            if (hostGhostPlayer.src) hostGhostPlayer.play();
         } else {
+            streamtoggler.innerText = "▶ Начать эфир";
+            streamtoggler.classList.replace('btn-danger', 'btn-success');
+            action = "pause";
+            hostGhostPlayer.pause();
+        }
+        
+        socket.send(JSON.stringify({'action': action}));
+    }
+
+    // 4. ЗАПИСЬ ГОЛОСА И ОТПРАВКА
+    let mediaRecorder;
+    let audioChunks = [];
+    let voiceBlob = null;
+    
+    const btnRecStart = document.getElementById('btn-rec-start');
+    const micActions = document.getElementById('mic-actions');
+    
+    if (btnRecStart) {
+        btnRecStart.onclick = async () => {
+            if (btnRecStart.innerText.includes("Начать")) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    
+                    mediaRecorder.onstop = () => {
+                        voiceBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        stream.getTracks().forEach(t => t.stop());
+                        btnRecStart.style.display = 'none';
+                        micActions.style.display = 'flex';
+                    };
+                    
+                    mediaRecorder.start();
+                    btnRecStart.innerText = "⏹ Остановить запись";
+                    btnRecStart.classList.replace('btn-danger', 'btn-secondary');
+                } catch (err) {
+                    alert("Нет доступа к микрофону!");
+                }
+            } else {
+                mediaRecorder.stop();
+            }
+        };
+    }
+
+    function sendHostVoice(actionType) {
+        if (!voiceBlob) return;
+        
+        if (actionType === 'live' && !isPlaying) {
+            alert('❌ Ошибка: Вы не можете сказать в эфир, пока он находится на паузе! Сначала снимите эфир с паузы.');
             return;
         }
-    }
-
-    playTrack(tracks[nextIndex].id, tracks[nextIndex].url);
-}
-
-hostGhostPlayer.onended = function() {
-    playNextTrack();
-};
-
-// ==========================================
-// Управление эфиром
-// ==========================================
-function toggleStream() {
-    socket.send(JSON.stringify({ action: 'play' }));
-    socket.send(JSON.stringify({ action: 'pause' }));
-}
-
-// ==========================================
-// Приём websocket событий
-// ==========================================
-socket.onmessage = function(e) {
-    const data = JSON.parse(e.data);
-
-    if (data.event_type === 'new_message') {
-        const msgList = document.getElementById('active-messages-list');
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-        let contentHtml = "";
-        if (data.text && data.text.length > 0) {
-            contentHtml = `<p style="font-size: 14px; margin-bottom: 5px;">${data.text}</p>`;
-        } else if (data.voice_url && data.voice_url.length > 0) {
-            contentHtml = `<audio controls src="${data.voice_url}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>`;
-        }
-
-        const newHtml = `
-            <div class="msg-card" style="border-left-color: #1db954;">
-                <div class="msg-header">
-                    <strong>${data.sender}</strong>
-                    <span style="color: #1db954; font-weight: bold;">Только что!</span>
-                </div>
-                ${contentHtml}
-                <div class="msg-actions">
-                    <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
-                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
-                        <input type="hidden" name="status" value="in_progress">
-                        <button type="submit" class="btn btn-secondary btn-small">В работу</button>
-                    </form>
-                    <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
-                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
-                        <input type="hidden" name="status" value="done">
-                        <button type="submit" class="btn btn-success btn-small">Завершить</button>
-                    </form>
-                </div>
-            </div>
-        `;
-
-        if (msgList) {
-            msgList.insertAdjacentHTML('afterbegin', newHtml);
-        }
-    }
-};
-
-socket.onclose = function() {
-    console.error("WebSocket соединение с эфиром потеряно.");
-};
-
-// ==========================================
-// Запись голоса ведущего
-// ==========================================
-let mediaRecorder;
-let audioChunks = [];
-let voiceBlob = null;
-
-const btnRecStart = document.getElementById('btn-rec-start');
-const micActions = document.getElementById('mic-actions');
-
-if (btnRecStart) {
-    btnRecStart.onclick = async () => {
-        if (btnRecStart.innerText.includes("Начать")) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
-                mediaRecorder.onstop = () => {
-                    voiceBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-                    stream.getTracks().forEach(t => t.stop());
-                    btnRecStart.style.display = 'none';
-                    micActions.style.display = 'flex';
-                };
-
-                mediaRecorder.start();
-                btnRecStart.innerText = "⏹ Остановить запись";
-                btnRecStart.classList.remove('btn-danger');
-                btnRecStart.classList.add('btn-secondary');
-            } catch (err) {
-                alert("Нет доступа к микрофону!");
+        
+        const fd = new FormData();
+        fd.append('voice_blob', voiceBlob, 'host_voice.mp3');
+        fd.append('action_type', actionType);
+        
+        fetch('/host/upload-voice/', {
+            method: 'POST',
+            body: fd
+        }).then(() => {
+            micActions.style.display = 'none';
+            btnRecStart.style.display = 'block';
+            btnRecStart.innerText = "⏺ Начать запись";
+            btnRecStart.classList.replace('btn-secondary', 'btn-danger');
+            voiceBlob = null;
+            
+            if (actionType === 'playlist') {
+                location.reload();
+            } else {
+                alert('Голос отправлен в прямой эфир!');
+                location.reload();
             }
-        } else {
-            mediaRecorder.stop();
+        });
+    }
+
+    if (document.getElementById('btn-send-playlist')) {
+        document.getElementById('btn-send-playlist').onclick = () => sendHostVoice('playlist');
+    }
+    if (document.getElementById('btn-send-live')) {
+        document.getElementById('btn-send-live').onclick = () => sendHostVoice('live');
+    }
+
+    // 5. ПРИЕМ СООБЩЕНИЙ ОТ СЛУШАТЕЛЕЙ
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        
+        if (data.event_type === 'new_message') {
+            const msgList = document.getElementById('active-messages-list');
+            const noMsgText = document.getElementById('no-msg-text');
+            
+            if (noMsgText) noMsgText.style.display = 'none';
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // ИСПРАВЛЕНО: Проверяем не на null, а на наличие символов в строке!
+            let contentHtml = "";
+            if (data.text && data.text.length > 0) {
+                contentHtml = `<p style="font-size: 14px; margin-bottom: 5px;">${data.text}</p>`;
+            } else if (data.voice_url && data.voice_url.length > 0) {
+                contentHtml = `<audio controls src="${data.voice_url}" style="width: 100%; height: 30px; margin-top: 5px;"></audio>`;
+            }
+            
+            const newHtml = `
+                <div class="msg-card" style="border-left-color: #1db954;">
+                    <div class="msg-header">
+                        <strong>${data.sender}</strong>
+                        <span style="color: #1db954; font-weight: bold;">Только что!</span>
+                    </div>
+                    ${contentHtml}
+                    <div class="msg-actions">
+                        <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
+                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                            <input type="hidden" name="status" value="in_progress">
+                            <button type="submit" class="btn btn-secondary btn-small">В работу</button>
+                        </form>
+                        <form action="/host/change-msg-status/${data.msg_id}/" method="POST" style="margin:0;">
+                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                            <input type="hidden" name="status" value="done">
+                            <button type="submit" class="btn btn-success btn-small">Завершить</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            if (msgList) {
+                msgList.insertAdjacentHTML('afterbegin', newHtml);
+            }
         }
     };
-}
+    window.changeMasterVolume = function(val) {
+        let volumeLevel = val / 100;
+        
+        // Снимаем мут у ведущего (чтобы он сам слышал)
+        hostGhostPlayer.muted = false; 
+        hostGhostPlayer.volume = volumeLevel;
 
-function sendHostVoice(actionType) {
-    if (!voiceBlob) return;
-
-    if (actionType === 'live' && !isPlaying) {
-        alert('❌ Ошибка: Вы не можете сказать в эфир, пока он находится на паузе! Сначала снимите эфир с паузы.');
-        return;
-    }
-
-    const fd = new FormData();
-    fd.append('voice_blob', voiceBlob, 'host_voice.webm');
-    fd.append('action_type', actionType);
-
-    fetch('/host/upload-voice/', {
-        method: 'POST',
-        body: fd
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Ошибка загрузки голоса");
+        // Шлем команду всем слушателям
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                'action': 'change_volume',
+                'volume': volumeLevel
+            }));
         }
-        return response.json();
-    })
-    .then(() => {
-        micActions.style.display = 'none';
-        btnRecStart.style.display = 'block';
-        btnRecStart.innerText = "⏺ Начать запись";
-        btnRecStart.classList.remove('btn-secondary');
-        btnRecStart.classList.add('btn-danger');
-        voiceBlob = null;
-
-        if (actionType === 'playlist') {
-            location.reload();
-        } else {
-            alert('Голос отправлен в прямой эфир!');
-            location.reload();
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("Не удалось отправить голос.");
-    });
-}
-
-const btnSendPlaylist = document.getElementById('btn-send-playlist');
-const btnSendLive = document.getElementById('btn-send-live');
-
-if (btnSendPlaylist) {
-    btnSendPlaylist.onclick = () => sendHostVoice('playlist');
-}
-
-if (btnSendLive) {
-    btnSendLive.onclick = () => sendHostVoice('live');
-}
-const masterVolumeSlider = document.getElementById('master-volume-slider');
-let masterVolume = 1.0;
-
-if (masterVolumeSlider) {
-    masterVolumeSlider.addEventListener('input', function() {
-        masterVolume = parseInt(this.value) / 100;
-
-        // Для ghost player это не критично, он muted, но пусть будет консистентно
-        hostGhostPlayer.volume = masterVolume;
-
-        socket.send(JSON.stringify({
-            action: 'set_volume',
-            volume: masterVolume
-        }));
-    });
-}
+    };
 </script>
+
+{% endif %}
+<!-- =================================================== --><!-- ГЛОБАЛЬНЫЕ СКРИПТЫ (Работают всегда, даже без сессии) --><!-- =================================================== -->
+ <script> 
+    document.addEventListener("DOMContentLoaded", function() {
+        const alerts = document.querySelectorAll('.alert'); 
+        alerts.forEach(function(alert) {
+            setTimeout(function() { 
+            alert.classList.add('fade-out'); 
+            setTimeout(function() { 
+                alert.remove();
+
+                }, 500); 
+            }, 3000);
+        }); 
+    });
+</script>
+
 {% endblock %}
