@@ -3,14 +3,18 @@ from django.core.validators import FileExtensionValidator, RegexValidator
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
-
+from django.utils import timezone
 
 # Create your models here.
 # Роли реализованны через django groups, пример в admin.py
 # 2 ВАЛИДАТОРА НИЖЕ РАБОТАЮТ ТОЛЬКО ПРИ ВЫЗОВЕ full-clean() при сохранении формы!!!!
+
+
 def validate_video_size(value):
     limit_mb = 1000
     if value.size > limit_mb * 1024 * 1024:
+        raise ValidationError(f"Файл слишком большой! Максимум {limit_mb} МБ.")
+
         raise ValidationError(f"Файл слишком большой! Максимум {limit_mb} МБ.")
 
 
@@ -46,6 +50,8 @@ class User(AbstractUser):
 
 
 class Message(models.Model):
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="messages")
+    host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="receivedmessages")
 
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="messages")
     host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="receivedmessages")
@@ -67,12 +73,23 @@ class Session(models.Model):
     def __str__(self):
         return self.title[:20]
 
+    state = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
+    creation_time = models.DateTimeField()
+
+    def str(self):
+        return self.sender.str()
+
 
 class VoiceMessage(Message):
     voice_message = models.FileField(
         upload_to="voice/",
         validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
+        upload_to="voice/",
+        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
     )
+
+    def str(self):
+        return super().str()
 
     def __str__(self):
         return super().__str__()
@@ -80,6 +97,9 @@ class VoiceMessage(Message):
 
 class TextMessage(Message):
     text = models.TextField()
+
+    def str(self):
+        return super().str()
 
     def __str__(self):
         return super().__str__()
@@ -89,9 +109,48 @@ class MediatekElement(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mediatekelements")
     name = models.CharField(max_length=100)
 
+    def url(self):
+        try:
+            return self.audio.audio_file.url
+        except:
+            try:
+                return self.video.video_file.url
+            except:
+                return ""
+
+
+class Session(models.Model):
+    title = models.CharField(max_length=50)
+    elements = models.ManyToManyField(Message, related_name="sessions", blank=True, null=True)
+    is_playing = models.BooleanField(default=False)
+    current_track_start_time = models.DateTimeField(null=True, blank=True)
+    current_track_paused_time = models.FloatField(default=0.0, null=True, blank=True)
+    current_track = models.ForeignKey(MediatekElement, on_delete=models.SET_NULL, null=True, blank=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sessions")
+    is_looping = models.BooleanField(default=False)
+    is_shuffled = models.BooleanField(default=False)
+
+    def get_state(self):
+        if not self.current_track:
+            return {"current_track": None, "position": 0, "is_playing": False}
+
+        position = self.current_track_paused_time
+        if self.is_playing and self.current_track:
+            time_elapsed = (timezone.now() - self.current_track_start_time).total_seconds()
+            position += time_elapsed
+
+        return {"current_track": self.current_track, "position": position, "is_playing": self.is_playing, "server_time": timezone.now().isoformat()}
+
+
+def __str__(self):
+    return self.title[:20]
+
 
 class Playlist(models.Model):
     title = models.CharField(max_length=100)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="playlists")
+    elements = models.ManyToManyField(MediatekElement, related_name="playlists", blank=True)
+
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="playlists")
     elements = models.ManyToManyField(MediatekElement, related_name="playlists", blank=True)
 
@@ -100,11 +159,15 @@ class Audio(MediatekElement):
     audio_file = models.FileField(
         upload_to="audio/",
         validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"]), validate_audio_size],
+        upload_to="audio/",
+        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"]), validate_audio_size],
     )
 
 
 class Video(MediatekElement):
     video_file = models.FileField(
+        upload_to="video/",
+        validators=[FileExtensionValidator(allowed_extensions=["mp4", "webm"]), validate_video_size],
         upload_to="video/",
         validators=[FileExtensionValidator(allowed_extensions=["mp4", "webm"]), validate_video_size],
     )

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Выбор эфира{% endblock %} 
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+    <h2>📻 Доступные эфиры</h2>
+    <p style="color: #666; margin-bottom: 20px;">Выберите трансляцию для подключения:</p>
+
+    <div style="display: grid; gap: 15px;">
+        {% for s in active_sessions %}
+            <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="margin: 0;">{{ s.title }}</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; color: {% if s.is_playing %}#2ecc71{% else %}gray{% endif %};">
+                        {% if s.is_playing %}▶ В эфире{% else %}⏸ Ожидание{% endif %}
+                    </p>
+                </div>
+                <!-- ССЫЛКА НА КОНКРЕТНУЮ КОМНАТУ -->
+                <a href="{% url 'player_room' s.id %}" class="btn-logout" style="background: rgb(116, 211, 255); text-decoration: none;">Подключиться</a>
+            </div>
+        {% empty %}
+            <p>Сейчас нет доступных эфиров.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
